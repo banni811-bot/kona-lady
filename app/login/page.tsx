@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -8,6 +9,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -174,16 +177,40 @@ export default function LoginPage() {
                 Пароль
               </label>
 
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Минимум 6 символов"
-                minLength={6}
-                required
-                className="w-full rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 outline-none focus:border-purple-400"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Минимум 6 символов"
+                  minLength={6}
+                  required
+                  className="w-full rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 pr-12 outline-none focus:border-purple-400"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  aria-label={
+                    showPassword ? "Скрыть пароль" : "Показать пароль"
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-xl text-purple-600 transition hover:bg-purple-100"
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
             </div>
+
+            {mode === "login" && (
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-semibold text-purple-600 hover:text-purple-800"
+                >
+                  Забыли пароль?
+                </Link>
+              </div>
+            )}
 
             {error && (
               <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
