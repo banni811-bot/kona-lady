@@ -23,6 +23,11 @@ type SelectedFile = {
   preview: string;
 };
 
+type SubcategoryOption = {
+  value: string;
+  label: string;
+};
+
 const categories = [
   "Одежда",
   "Обувь",
@@ -30,38 +35,47 @@ const categories = [
   "Аксессуары",
 ];
 
-const subcategories: Record<string, string[]> = {
+const subcategories: Record<
+  string,
+  SubcategoryOption[]
+> = {
   Одежда: [
-    "dresses",
-    "tops",
-    "shirts",
-    "blouses",
-    "skirts",
-    "pants",
-    "jeans",
-    "jackets",
-    "outerwear",
+    { value: "dresses", label: "Платья" },
+    { value: "tops", label: "Топы" },
+    { value: "shirts", label: "Рубашки" },
+    { value: "blouses", label: "Блузки" },
+    { value: "skirts", label: "Юбки" },
+    { value: "pants", label: "Брюки" },
+    { value: "jeans", label: "Джинсы" },
+    { value: "jackets", label: "Куртки" },
+    { value: "outerwear", label: "Верхняя одежда" },
   ],
+
   Обувь: [
-    "sneakers",
-    "boots",
-    "shoes",
-    "sandals",
-    "heels",
+    { value: "sneakers", label: "Кроссовки" },
+    { value: "boots", label: "Ботинки" },
+    { value: "shoes", label: "Туфли" },
+    { value: "sandals", label: "Сандалии" },
+    { value: "heels", label: "Обувь на каблуке" },
   ],
+
   Косметика: [
-    "face",
-    "eyes",
-    "lips",
-    "hair",
-    "body",
+    { value: "face", label: "Для лица" },
+    { value: "eyes", label: "Для глаз" },
+    { value: "lips", label: "Для губ" },
+    { value: "hair", label: "Для волос" },
+    { value: "body", label: "Для тела" },
   ],
+
   Аксессуары: [
-    "bags",
-    "belts",
-    "jewelry",
-    "watches",
-    "sunglasses",
+    { value: "bags", label: "Сумки" },
+    { value: "belts", label: "Ремни" },
+    { value: "jewelry", label: "Украшения" },
+    { value: "watches", label: "Часы" },
+    {
+      value: "sunglasses",
+      label: "Солнцезащитные очки",
+    },
   ],
 };
 
@@ -73,8 +87,10 @@ export default function NewProductPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Аксессуары");
-  const [subcategory, setSubcategory] = useState("bags");
-  const [description, setDescription] = useState("");
+  const [subcategory, setSubcategory] =
+    useState("bags");
+  const [description, setDescription] =
+    useState("");
 
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
@@ -83,30 +99,32 @@ export default function NewProductPage() {
   const [style, setStyle] = useState("");
   const [gender, setGender] = useState("");
   const [country, setCountry] = useState("");
-  const [composition, setComposition] = useState("");
+  const [composition, setComposition] =
+    useState("");
   const [sizeGroup, setSizeGroup] = useState("");
   const [sleeve, setSleeve] = useState("");
   const [length, setLength] = useState("");
   const [neckline, setNeckline] = useState("");
   const [closure, setClosure] = useState("");
   const [fit, setFit] = useState("");
-  const [fabricFeatures, setFabricFeatures] = useState("");
+  const [fabricFeatures, setFabricFeatures] =
+    useState("");
 
-  const [stockQuantity, setStockQuantity] = useState("0");
+  const [stockQuantity, setStockQuantity] =
+    useState("0");
 
-  const [measurements, setMeasurements] = useState<
-    MeasurementRow[]
-  >([]);
+  const [measurements, setMeasurements] =
+    useState<MeasurementRow[]>([]);
 
-  const [selectedFiles, setSelectedFiles] = useState<
-    SelectedFile[]
-  >([]);
+  const [selectedFiles, setSelectedFiles] =
+    useState<SelectedFile[]>([]);
 
   function handleCategoryChange(value: string) {
     setCategory(value);
 
     const options = subcategories[value] ?? [];
-    setSubcategory(options[0] ?? "");
+
+    setSubcategory(options[0]?.value ?? "");
   }
 
   function addMeasurement() {
@@ -149,16 +167,20 @@ export default function NewProductPage() {
   function handleImageChange(
     event: ChangeEvent<HTMLInputElement>
   ) {
-    const files = Array.from(event.target.files ?? []);
+    const files = Array.from(
+      event.target.files ?? []
+    );
 
     if (!files.length) {
       return;
     }
 
-    const newFiles: SelectedFile[] = files.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
+    const newFiles: SelectedFile[] = files.map(
+      (file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      })
+    );
 
     setSelectedFiles((current) => [
       ...current,
@@ -185,7 +207,8 @@ export default function NewProductPage() {
     file: File
   ): Promise<string | null> {
     const extension =
-      file.name.split(".").pop()?.toLowerCase() || "jpg";
+      file.name.split(".").pop()?.toLowerCase() ||
+      "jpg";
 
     const fileName = `${productId}-${Date.now()}-${Math.random()
       .toString(36)
@@ -193,11 +216,12 @@ export default function NewProductPage() {
 
     const filePath = `products/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("product-images")
-      .upload(filePath, file, {
-        upsert: false,
-      });
+    const { error: uploadError } =
+      await supabase.storage
+        .from("product-images")
+        .upload(filePath, file, {
+          upsert: false,
+        });
 
     if (uploadError) {
       console.error(uploadError);
@@ -224,10 +248,17 @@ export default function NewProductPage() {
       sortOrder: number;
     }[] = [];
 
-    for (let index = 0; index < selectedFiles.length; index++) {
+    for (
+      let index = 0;
+      index < selectedFiles.length;
+      index++
+    ) {
       const file = selectedFiles[index].file;
 
-      const url = await uploadImage(productId, file);
+      const url = await uploadImage(
+        productId,
+        file
+      );
 
       if (url) {
         uploadedImages.push({
@@ -260,9 +291,13 @@ export default function NewProductPage() {
     return uploadedImages[0].url;
   }
 
-  async function saveMeasurements(productId: number) {
+  async function saveMeasurements(
+    productId: number
+  ) {
     const validMeasurements = measurements
-      .filter((row) => row.size.trim() !== "")
+      .filter(
+        (row) => row.size.trim() !== ""
+      )
       .map((row) => ({
         product_id: productId,
         size: row.size.trim(),
@@ -313,7 +348,9 @@ export default function NewProductPage() {
       return;
     }
 
-    const quantity = Number(stockQuantity);
+    const quantity = Number(
+      stockQuantity
+    );
 
     if (
       !Number.isInteger(quantity) ||
@@ -328,46 +365,47 @@ export default function NewProductPage() {
     setSaving(true);
 
     try {
-      /*
-       * СНАЧАЛА создаём сам товар.
-       * После этого Supabase вернёт его новый ID.
-       */
-      const { data: product, error: productError } =
-        await supabase
-          .from("products")
-          .insert({
-            name: name.trim(),
-            price_uah: Number(price),
-            category,
-            subcategory,
-            description: description.trim() || null,
+      const {
+        data: product,
+        error: productError,
+      } = await supabase
+        .from("products")
+        .insert({
+          name: name.trim(),
+          price_uah: Number(price),
+          category,
+          subcategory,
+          description:
+            description.trim() || null,
 
-            brand: brand.trim() || null,
-            material: material.trim() || null,
-            color: color.trim() || null,
-            season: season.trim() || null,
-            style: style.trim() || null,
-            gender: gender.trim() || null,
-            country: country.trim() || null,
-            composition: composition.trim() || null,
-            size_group: sizeGroup.trim() || null,
-            sleeve: sleeve.trim() || null,
-            length: length.trim() || null,
-            neckline: neckline.trim() || null,
-            closure: closure.trim() || null,
-            fit: fit.trim() || null,
-            fabric_features:
-              fabricFeatures.trim() || null,
+          brand: brand.trim() || null,
+          material: material.trim() || null,
+          color: color.trim() || null,
+          season: season.trim() || null,
+          style: style.trim() || null,
+          gender: gender.trim() || null,
+          country: country.trim() || null,
+          composition:
+            composition.trim() || null,
+          size_group:
+            sizeGroup.trim() || null,
+          sleeve: sleeve.trim() || null,
+          length: length.trim() || null,
+          neckline: neckline.trim() || null,
+          closure: closure.trim() || null,
+          fit: fit.trim() || null,
+          fabric_features:
+            fabricFeatures.trim() || null,
 
-            stock_quantity: quantity,
+          stock_quantity: quantity,
 
-            is_available: quantity > 0,
-            is_active: true,
+          is_available: quantity > 0,
+          is_active: true,
 
-            image_url: null,
-          })
-          .select("id")
-          .single();
+          image_url: null,
+        })
+        .select("id")
+        .single();
 
       if (productError || !product) {
         console.error(productError);
@@ -380,24 +418,18 @@ export default function NewProductPage() {
 
       const productId = product.id;
 
-      /*
-       * Теперь у товара есть ID.
-       * Загружаем фотографии.
-       */
-      const mainImage = await saveImages(productId);
+      const mainImage =
+        await saveImages(productId);
 
-      /*
-       * Если есть главное фото,
-       * записываем его также в products.image_url.
-       */
       if (mainImage) {
-        const { error: imageUpdateError } =
-          await supabase
-            .from("products")
-            .update({
-              image_url: mainImage,
-            })
-            .eq("id", productId);
+        const {
+          error: imageUpdateError,
+        } = await supabase
+          .from("products")
+          .update({
+            image_url: mainImage,
+          })
+          .eq("id", productId);
 
         if (imageUpdateError) {
           throw new Error(
@@ -406,16 +438,12 @@ export default function NewProductPage() {
         }
       }
 
-      /*
-       * Сохраняем замеры.
-       */
       await saveMeasurements(productId);
 
-      /*
-       * Освобождаем временные preview-ссылки.
-       */
       selectedFiles.forEach((item) => {
-        URL.revokeObjectURL(item.preview);
+        URL.revokeObjectURL(
+          item.preview
+        );
       });
 
       alert(
@@ -515,7 +543,9 @@ export default function NewProductPage() {
                   step="1"
                   value={stockQuantity}
                   onChange={(e) =>
-                    setStockQuantity(e.target.value)
+                    setStockQuantity(
+                      e.target.value
+                    )
                   }
                   className="w-full rounded-2xl border-2 border-purple-300 bg-purple-50 px-4 py-3 text-lg font-bold outline-none focus:border-purple-600"
                 />
@@ -539,14 +569,16 @@ export default function NewProductPage() {
                   }
                   className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-purple-500"
                 >
-                  {categories.map((item) => (
-                    <option
-                      key={item}
-                      value={item}
-                    >
-                      {item}
-                    </option>
-                  ))}
+                  {categories.map(
+                    (item) => (
+                      <option
+                        key={item}
+                        value={item}
+                      >
+                        {item}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
@@ -564,13 +596,16 @@ export default function NewProductPage() {
                   }
                   className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-purple-500"
                 >
-                  {(subcategories[category] ??
-                    []).map((item) => (
+                  {(
+                    subcategories[
+                      category
+                    ] ?? []
+                  ).map((item) => (
                     <option
-                      key={item}
-                      value={item}
+                      key={item.value}
+                      value={item.value}
                     >
-                      {item}
+                      {item.label}
                     </option>
                   ))}
                 </select>
@@ -625,7 +660,9 @@ export default function NewProductPage() {
                 <input
                   value={material}
                   onChange={(e) =>
-                    setMaterial(e.target.value)
+                    setMaterial(
+                      e.target.value
+                    )
                   }
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
                 />
@@ -771,7 +808,9 @@ export default function NewProductPage() {
                 <input
                   value={neckline}
                   onChange={(e) =>
-                    setNeckline(e.target.value)
+                    setNeckline(
+                      e.target.value
+                    )
                   }
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
                 />
@@ -785,7 +824,9 @@ export default function NewProductPage() {
                 <input
                   value={closure}
                   onChange={(e) =>
-                    setClosure(e.target.value)
+                    setClosure(
+                      e.target.value
+                    )
                   }
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
                 />

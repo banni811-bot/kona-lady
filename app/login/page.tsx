@@ -62,16 +62,26 @@ export default function LoginPage() {
       }
 
       setMessage(
-        "Регистрация выполнена. Проверьте email и подтвердите адрес.",
+        `📧 Проверьте свою почту!
+
+Мы отправили письмо с подтверждением на ${email}.
+
+Откройте письмо от KONA LADY и нажмите ссылку для подтверждения регистрации.
+
+Если письма нет — проверьте папку «Спам».
+
+После подтверждения почты вы сможете войти в свой аккаунт.`
       );
+
       setLoading(false);
       return;
     }
 
-    const { error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error: loginError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
     if (loginError) {
       setError(loginError.message);
@@ -84,7 +94,9 @@ export default function LoginPage() {
     } = await supabase.auth.getSession();
 
     if (!session) {
-      setError("Вход выполнен, но сессия не найдена. Попробуйте войти ещё раз.");
+      setError(
+        "Вход выполнен, но сессия не найдена. Попробуйте войти ещё раз."
+      );
       setLoading(false);
       return;
     }
@@ -190,7 +202,9 @@ export default function LoginPage() {
 
                 <button
                   type="button"
-                  onClick={() => setShowPassword((value) => !value)}
+                  onClick={() =>
+                    setShowPassword((value) => !value)
+                  }
                   aria-label={
                     showPassword ? "Скрыть пароль" : "Показать пароль"
                   }
@@ -219,7 +233,7 @@ export default function LoginPage() {
             )}
 
             {message && (
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700">
+              <div className="whitespace-pre-line rounded-2xl bg-green-50 px-4 py-4 text-sm leading-6 text-green-700">
                 {message}
               </div>
             )}
