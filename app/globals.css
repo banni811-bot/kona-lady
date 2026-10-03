@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f3ff;
+  --foreground: #17121f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #f7f3ff;
+}
+
+body {
+  margin: 0;
+  background: #f7f3ff;
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* =========================
+   SHOP AI PLANETS
+   ========================= */
+
+.planet-banner {
+  isolation: isolate;
+}
+
+.planet {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.planet-one {
+  width: 280px;
+  height: 280px;
+  right: 8%;
+  top: 25px;
+  background:
+    radial-gradient(
+      circle at 30% 25%,
+      #ffffff 0%,
+      #d9b8ff 8%,
+      #9b4dff 30%,
+      #5b18a8 58%,
+      #21083d 100%
+    );
+  box-shadow:
+    0 0 45px rgba(170, 80, 255, 0.7),
+    0 0 100px rgba(120, 30, 255, 0.35);
+  animation: planetFloat 7s ease-in-out infinite;
+}
+
+.planet-two {
+  width: 105px;
+  height: 105px;
+  right: 42%;
+  bottom: 25px;
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      #f2dcff 0%,
+      #c06cff 22%,
+      #6920a8 62%,
+      #260b42 100%
+    );
+  box-shadow: 0 0 35px rgba(190, 100, 255, 0.55);
+  animation: planetFloatSmall 5s ease-in-out infinite;
+}
+
+.planet-three {
+  width: 55px;
+  height: 55px;
+  right: 4%;
+  bottom: 30px;
+  background:
+    radial-gradient(
+      circle at 30% 25%,
+      #ffffff 0%,
+      #d4a5ff 15%,
+      #7c27c8 60%,
+      #2b0948 100%
+    );
+  box-shadow: 0 0 25px rgba(180, 80, 255, 0.5);
+  animation: planetFloatSmall 4s ease-in-out infinite reverse;
+}
+
+.planet::after {
+  content: "";
+  position: absolute;
+  width: 155%;
+  height: 28%;
+  left: -28%;
+  top: 42%;
+  border: 2px solid rgba(221, 178, 255, 0.45);
+  border-radius: 50%;
+  transform: rotate(-18deg);
+  box-shadow: 0 0 15px rgba(198, 130, 255, 0.25);
+}
+
+.planet-two::after,
+.planet-three::after {
+  display: none;
+}
+
+@keyframes planetFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  50% {
+    transform: translate3d(0, -16px, 0) rotate(4deg);
+  }
+}
+
+@keyframes planetFloatSmall {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(8px, -12px, 0);
+  }
+}
+
+/* =========================
+   MOBILE
+   ========================= */
+
+@media (max-width: 767px) {
+  .planet-one {
+    width: 180px;
+    height: 180px;
+    right: -35px;
+    top: 45px;
+  }
+
+  .planet-two {
+    width: 70px;
+    height: 70px;
+    right: 35%;
+    bottom: 20px;
+  }
+
+  .planet-three {
+    width: 35px;
+    height: 35px;
+    right: 5%;
+    bottom: 20px;
+  }
+}
