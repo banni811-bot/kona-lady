@@ -35,46 +35,87 @@ const categories = [
   "Аксессуары",
 ];
 
-const subcategories: Record<
-  string,
-  SubcategoryOption[]
-> = {
+const subcategories: Record<string, SubcategoryOption[]> = {
   Одежда: [
-    { value: "dresses", label: "Платья" },
-    { value: "tops", label: "Топы" },
-    { value: "shirts", label: "Рубашки" },
-    { value: "blouses", label: "Блузки" },
-    { value: "skirts", label: "Юбки" },
+    { value: "blouses", label: "Блузы" },
     { value: "pants", label: "Брюки" },
     { value: "jeans", label: "Джинсы" },
-    { value: "jackets", label: "Куртки" },
-    { value: "outerwear", label: "Верхняя одежда" },
+    { value: "homewear", label: "Домашняя одежда" },
+    { value: "vests", label: "Жилеты" },
+    { value: "cardigans", label: "Кардиганы" },
+    { value: "jumpsuits", label: "Комбинезоны" },
+    { value: "suits", label: "Костюмы" },
+    { value: "leggings", label: "Лосины" },
+    { value: "tank-tops", label: "Майки" },
+    { value: "blazers", label: "Пиджаки" },
+    { value: "dresses", label: "Платья" },
+    { value: "shirts", label: "Рубашки" },
+    { value: "sundresses", label: "Сарафаны" },
+    {
+      value: "sweaters-hoodies",
+      label: "Свитера, кофты и худи",
+    },
+    { value: "sportswear", label: "Спортивная одежда" },
+    { value: "tops", label: "Топы" },
+    { value: "tunics", label: "Туники" },
+    { value: "t-shirts", label: "Футболки" },
+    { value: "shorts", label: "Шорты" },
+    { value: "skirts", label: "Юбки" },
+    {
+      value: "outerwear",
+      label: "Куртки и верхняя одежда",
+    },
+    { value: "underwear", label: "Бельё" },
   ],
 
   Обувь: [
-    { value: "sneakers", label: "Кроссовки" },
-    { value: "boots", label: "Ботинки" },
-    { value: "shoes", label: "Туфли" },
-    { value: "sandals", label: "Сандалии" },
-    { value: "heels", label: "Обувь на каблуке" },
+    { value: "uggs", label: "Угги" },
+    { value: "loafers", label: "Лоферы" },
+    {
+      value: "clogs-slippers",
+      label: "Сабо и шлёпанцы",
+    },
+    {
+      value: "flip-flops",
+      label: "Вьетнамки и сланцы",
+    },
+    { value: "sandals", label: "Босоножки" },
+    {
+      value: "boots",
+      label: "Ботинки и ботильоны",
+    },
+    {
+      value: "sneakers",
+      label: "Кеды и кроссовки",
+    },
+    { value: "slippers", label: "Тапочки" },
   ],
 
   Косметика: [
-    { value: "face", label: "Для лица" },
-    { value: "eyes", label: "Для глаз" },
-    { value: "lips", label: "Для губ" },
-    { value: "hair", label: "Для волос" },
-    { value: "body", label: "Для тела" },
+    {
+      value: "makeup",
+      label: "Макияж",
+    },
   ],
 
   Аксессуары: [
     { value: "bags", label: "Сумки" },
+    { value: "wallets", label: "Кошельки" },
+    { value: "clutches", label: "Клатчи" },
     { value: "belts", label: "Ремни" },
     { value: "jewelry", label: "Украшения" },
-    { value: "watches", label: "Часы" },
+    { value: "earrings", label: "Серьги" },
+    { value: "rings", label: "Кольца" },
+    { value: "bracelets", label: "Браслеты" },
+    { value: "necklaces", label: "Ожерелья" },
+    { value: "glasses", label: "Очки" },
     {
-      value: "sunglasses",
-      label: "Солнцезащитные очки",
+      value: "hats",
+      label: "Головные уборы",
+    },
+    {
+      value: "scarves",
+      label: "Шарфы и платки",
     },
   ],
 };
@@ -82,54 +123,84 @@ const subcategories: Record<
 export default function NewProductPage() {
   const router = useRouter();
 
-  const [saving, setSaving] = useState(false);
-
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Аксессуары");
-  const [subcategory, setSubcategory] =
-    useState("bags");
-  const [description, setDescription] =
-    useState("");
-
+  const [subcategory, setSubcategory] = useState("bags");
+  const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
+  const [storeName, setStoreName] = useState("");
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
   const [color, setColor] = useState("");
   const [season, setSeason] = useState("");
   const [style, setStyle] = useState("");
-  const [gender, setGender] = useState("");
+  const [gender, setGender] = useState("Женский");
   const [country, setCountry] = useState("");
-  const [composition, setComposition] =
-    useState("");
+  const [composition, setComposition] = useState("");
   const [sizeGroup, setSizeGroup] = useState("");
   const [sleeve, setSleeve] = useState("");
   const [length, setLength] = useState("");
   const [neckline, setNeckline] = useState("");
   const [closure, setClosure] = useState("");
   const [fit, setFit] = useState("");
-  const [fabricFeatures, setFabricFeatures] =
-    useState("");
+  const [fabricFeatures, setFabricFeatures] = useState("");
 
-  const [stockQuantity, setStockQuantity] =
-    useState("0");
+  const [files, setFiles] = useState<SelectedFile[]>([]);
+  const [measurements, setMeasurements] = useState<
+    MeasurementRow[]
+  >([]);
 
-  const [measurements, setMeasurements] =
-    useState<MeasurementRow[]>([]);
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [quantity, setQuantity] = useState("1");
 
-  const [selectedFiles, setSelectedFiles] =
-    useState<SelectedFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const currentSubcategories =
+    subcategories[category] ?? [];
 
   function handleCategoryChange(value: string) {
     setCategory(value);
 
-    const options = subcategories[value] ?? [];
+    const firstSubcategory =
+      subcategories[value]?.[0]?.value ?? "";
 
-    setSubcategory(options[0]?.value ?? "");
+    setSubcategory(firstSubcategory);
+  }
+
+  function handleFilesChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const selected = Array.from(
+      event.target.files ?? []
+    );
+
+    const newFiles: SelectedFile[] = selected.map(
+      (file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      })
+    );
+
+    setFiles((prev) => [...prev, ...newFiles]);
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => {
+      const removed = prev[index];
+
+      if (removed) {
+        URL.revokeObjectURL(removed.preview);
+      }
+
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   function addMeasurement() {
-    setMeasurements((current) => [
-      ...current,
+    setMeasurements((prev) => [
+      ...prev,
       {
         size: "",
         bust_cm: "",
@@ -146,8 +217,8 @@ export default function NewProductPage() {
     field: keyof MeasurementRow,
     value: string
   ) {
-    setMeasurements((current) =>
-      current.map((row, i) =>
+    setMeasurements((prev) =>
+      prev.map((row, i) =>
         i === index
           ? {
               ...row,
@@ -159,60 +230,20 @@ export default function NewProductPage() {
   }
 
   function removeMeasurement(index: number) {
-    setMeasurements((current) =>
-      current.filter((_, i) => i !== index)
+    setMeasurements((prev) =>
+      prev.filter((_, i) => i !== index)
     );
   }
 
-  function handleImageChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const files = Array.from(
-      event.target.files ?? []
-    );
-
-    if (!files.length) {
-      return;
-    }
-
-    const newFiles: SelectedFile[] = files.map(
-      (file) => ({
-        file,
-        preview: URL.createObjectURL(file),
-      })
-    );
-
-    setSelectedFiles((current) => [
-      ...current,
-      ...newFiles,
-    ]);
-
-    event.target.value = "";
-  }
-
-  function removeImage(index: number) {
-    setSelectedFiles((current) => {
-      const image = current[index];
-
-      if (image) {
-        URL.revokeObjectURL(image.preview);
-      }
-
-      return current.filter((_, i) => i !== index);
-    });
-  }
-
-  async function uploadImage(
+  async function uploadProductImage(
+    file: File,
     productId: number,
-    file: File
-  ): Promise<string | null> {
+    index: number
+  ) {
     const extension =
-      file.name.split(".").pop()?.toLowerCase() ||
-      "jpg";
+      file.name.split(".").pop() || "jpg";
 
-    const fileName = `${productId}-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}.${extension}`;
+    const fileName = `${productId}-${Date.now()}-${index}.${extension}`;
 
     const filePath = `products/${fileName}`;
 
@@ -220,15 +251,12 @@ export default function NewProductPage() {
       await supabase.storage
         .from("product-images")
         .upload(filePath, file, {
+          cacheControl: "3600",
           upsert: false,
         });
 
     if (uploadError) {
-      console.error(uploadError);
-
-      throw new Error(
-        `Ошибка загрузки изображения: ${uploadError.message}`
-      );
+      throw uploadError;
     }
 
     const { data } = supabase.storage
@@ -238,271 +266,232 @@ export default function NewProductPage() {
     return data.publicUrl;
   }
 
-  async function saveImages(productId: number) {
-    if (!selectedFiles.length) {
-      return null;
-    }
-
-    const uploadedImages: {
-      url: string;
-      sortOrder: number;
-    }[] = [];
-
-    for (
-      let index = 0;
-      index < selectedFiles.length;
-      index++
-    ) {
-      const file = selectedFiles[index].file;
-
-      const url = await uploadImage(
-        productId,
-        file
-      );
-
-      if (url) {
-        uploadedImages.push({
-          url,
-          sortOrder: index,
-        });
-      }
-    }
-
-    if (!uploadedImages.length) {
-      return null;
-    }
-
-    const rows = uploadedImages.map((image) => ({
-      product_id: productId,
-      image_url: image.url,
-      sort_order: image.sortOrder,
-    }));
-
-    const { error } = await supabase
-      .from("product_images")
-      .insert(rows);
-
-    if (error) {
-      throw new Error(
-        `Не удалось сохранить фотографии: ${error.message}`
-      );
-    }
-
-    return uploadedImages[0].url;
-  }
-
-  async function saveMeasurements(
-    productId: number
-  ) {
-    const validMeasurements = measurements
-      .filter(
-        (row) => row.size.trim() !== ""
-      )
-      .map((row) => ({
-        product_id: productId,
-        size: row.size.trim(),
-        bust_cm: row.bust_cm
-          ? Number(row.bust_cm)
-          : null,
-        waist_cm: row.waist_cm
-          ? Number(row.waist_cm)
-          : null,
-        hips_cm: row.hips_cm
-          ? Number(row.hips_cm)
-          : null,
-        length_cm: row.length_cm
-          ? Number(row.length_cm)
-          : null,
-        sleeve_cm: row.sleeve_cm
-          ? Number(row.sleeve_cm)
-          : null,
-      }));
-
-    if (!validMeasurements.length) {
-      return;
-    }
-
-    const { error } = await supabase
-      .from("product_measurements")
-      .insert(validMeasurements);
-
-    if (error) {
-      throw new Error(
-        `Не удалось сохранить замеры: ${error.message}`
-      );
-    }
-  }
-
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
-    if (!name.trim()) {
-      alert("Введите название товара");
-      return;
-    }
-
-    if (!price || Number(price) < 0) {
-      alert("Введите корректную цену");
-      return;
-    }
-
-    const quantity = Number(
-      stockQuantity
-    );
-
-    if (
-      !Number.isInteger(quantity) ||
-      quantity < 0
-    ) {
-      alert(
-        "Количество на складе должно быть целым числом от 0"
-      );
-      return;
-    }
-
-    setSaving(true);
+    setLoading(true);
+    setError("");
+    setMessage("");
 
     try {
-      const {
-        data: product,
-        error: productError,
-      } = await supabase
-        .from("products")
-        .insert({
-          name: name.trim(),
-          price_uah: Number(price),
-          category,
-          subcategory,
-          description:
-            description.trim() || null,
-
-          brand: brand.trim() || null,
-          material: material.trim() || null,
-          color: color.trim() || null,
-          season: season.trim() || null,
-          style: style.trim() || null,
-          gender: gender.trim() || null,
-          country: country.trim() || null,
-          composition:
-            composition.trim() || null,
-          size_group:
-            sizeGroup.trim() || null,
-          sleeve: sleeve.trim() || null,
-          length: length.trim() || null,
-          neckline: neckline.trim() || null,
-          closure: closure.trim() || null,
-          fit: fit.trim() || null,
-          fabric_features:
-            fabricFeatures.trim() || null,
-
-          stock_quantity: quantity,
-
-          is_available: quantity > 0,
-          is_active: true,
-
-          image_url: null,
-        })
-        .select("id")
-        .single();
-
-      if (productError || !product) {
-        console.error(productError);
-
+      if (!name.trim()) {
         throw new Error(
-          productError?.message ||
-            "Не удалось создать товар"
+          "Введите название товара."
         );
       }
 
-      const productId = product.id;
+      if (!price.trim()) {
+        throw new Error(
+          "Введите цену товара."
+        );
+      }
 
-      const mainImage =
-        await saveImages(productId);
+      const priceNumber = Number(
+        price.replace(",", ".")
+      );
 
-      if (mainImage) {
-        const {
-          error: imageUpdateError,
-        } = await supabase
+      if (
+        Number.isNaN(priceNumber) ||
+        priceNumber < 0
+      ) {
+        throw new Error(
+          "Цена указана некорректно."
+        );
+      }
+
+      const quantityNumber = Math.max(
+        0,
+        Number.parseInt(quantity, 10) || 0
+      );
+
+      const { data: product, error: productError } =
+        await supabase
           .from("products")
-          .update({
-            image_url: mainImage,
+          .insert({
+            name: name.trim(),
+            category,
+            subcategory,
+            price_uah: priceNumber,
+            description:
+              description.trim() || null,
+            store_name:
+              storeName.trim() || null,
+            brand: brand.trim() || null,
+            material: material.trim() || null,
+            color: color.trim() || null,
+            season: season.trim() || null,
+            style: style.trim() || null,
+            gender: gender.trim() || null,
+            country: country.trim() || null,
+            composition:
+              composition.trim() || null,
+            size_group:
+              sizeGroup.trim() || null,
+            sleeve: sleeve.trim() || null,
+            length: length.trim() || null,
+            neckline:
+              neckline.trim() || null,
+            closure: closure.trim() || null,
+            fit: fit.trim() || null,
+            fabric_features:
+              fabricFeatures.trim() || null,
+            is_available:
+              isAvailable && quantityNumber > 0,
           })
-          .eq("id", productId);
+          .select()
+          .single();
 
-        if (imageUpdateError) {
-          throw new Error(
-            `Не удалось сохранить главное фото: ${imageUpdateError.message}`
-          );
+      if (productError) {
+        throw productError;
+      }
+
+      if (!product) {
+        throw new Error(
+          "Товар не был создан."
+        );
+      }
+
+      if (files.length > 0) {
+        for (
+          let index = 0;
+          index < files.length;
+          index++
+        ) {
+          const imageUrl =
+            await uploadProductImage(
+              files[index].file,
+              product.id,
+              index
+            );
+
+          const { error: imageError } =
+            await supabase
+              .from("product_images")
+              .insert({
+                product_id: product.id,
+                image_url: imageUrl,
+                sort_order: index,
+              });
+
+          if (imageError) {
+            throw imageError;
+          }
+
+          if (index === 0) {
+            const { error: updateError } =
+              await supabase
+                .from("products")
+                .update({
+                  image_url: imageUrl,
+                })
+                .eq("id", product.id);
+
+            if (updateError) {
+              throw updateError;
+            }
+          }
         }
       }
 
-      await saveMeasurements(productId);
-
-      selectedFiles.forEach((item) => {
-        URL.revokeObjectURL(
-          item.preview
+      const validMeasurements =
+        measurements.filter(
+          (row) => row.size.trim()
         );
-      });
 
-      alert(
-        `Товар успешно добавлен! ID товара: ${productId}`
+      if (validMeasurements.length > 0) {
+        const rows =
+          validMeasurements.map((row) => ({
+            product_id: product.id,
+            size: row.size.trim(),
+            bust_cm:
+              row.bust_cm.trim()
+                ? Number(row.bust_cm)
+                : null,
+            waist_cm:
+              row.waist_cm.trim()
+                ? Number(row.waist_cm)
+                : null,
+            hips_cm:
+              row.hips_cm.trim()
+                ? Number(row.hips_cm)
+                : null,
+            length_cm:
+              row.length_cm.trim()
+                ? Number(row.length_cm)
+                : null,
+            sleeve_cm:
+              row.sleeve_cm.trim()
+                ? Number(row.sleeve_cm)
+                : null,
+          }));
+
+        const { error: measurementsError } =
+          await supabase
+            .from("product_measurements")
+            .insert(rows);
+
+        if (measurementsError) {
+          throw measurementsError;
+        }
+      }
+
+      setMessage(
+        "Товар успешно добавлен!"
       );
 
-      router.push("/admin/products");
-      router.refresh();
-    } catch (error) {
-      console.error(error);
+      setTimeout(() => {
+        router.push("/admin/products");
+      }, 800);
+    } catch (err) {
+      console.error(err);
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Произошла ошибка при добавлении товара"
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Не удалось добавить товар."
       );
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f3ff] px-4 py-6">
-      <div className="mx-auto max-w-6xl">
-        <Link
-          href="/admin/products"
-          className="mb-4 inline-block text-sm text-purple-700 hover:underline"
-        >
-          ← Назад к товарам
-        </Link>
+    <main className="min-h-screen bg-purple-50 px-4 py-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-purple-950">
+              Добавить товар
+            </h1>
 
-        <div className="mb-6">
-          <div className="text-2xl font-bold text-purple-700">
-            ✦ KONA LADY
+            <p className="mt-1 text-sm text-gray-600">
+              Создание нового товара KONA LADY
+            </p>
           </div>
 
-          <h1 className="mt-2 text-3xl font-bold text-gray-900">
-            Добавить товар
-          </h1>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Создайте новый товар магазина.
-          </p>
+          <Link
+            href="/admin/products"
+            className="rounded-xl bg-white px-4 py-2 font-medium text-purple-700 shadow-sm hover:bg-purple-100"
+          >
+            ← К товарам
+          </Link>
         </div>
 
         <form
           onSubmit={handleSubmit}
           className="space-y-6"
         >
-          {/* ОСНОВНАЯ ИНФОРМАЦИЯ */}
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="mb-5 text-xl font-bold">
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-xl font-bold text-purple-950">
               Основная информация
             </h2>
 
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium">
-                  Название товара
+                <label className="mb-1 block text-sm font-medium">
+                  Название товара *
                 </label>
 
                 <input
@@ -510,54 +499,14 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setName(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-purple-500"
                   placeholder="Например: Платье женское классическое"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Цена, грн
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={price}
-                  onChange={(e) =>
-                    setPrice(e.target.value)
-                  }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
-                  placeholder="0"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Количество на складе
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={stockQuantity}
-                  onChange={(e) =>
-                    setStockQuantity(
-                      e.target.value
-                    )
-                  }
-                  className="w-full rounded-2xl border-2 border-purple-300 bg-purple-50 px-4 py-3 text-lg font-bold outline-none focus:border-purple-600"
-                />
-
-                <p className="mt-2 text-xs text-gray-500">
-                  0 = товара нет в наличии.
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Категория
+                <label className="mb-1 block text-sm font-medium">
+                  Категория *
                 </label>
 
                 <select
@@ -567,24 +516,22 @@ export default function NewProductPage() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-purple-500"
                 >
-                  {categories.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {item}
-                      </option>
-                    )
-                  )}
+                  {categories.map((item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Подкатегория
+                <label className="mb-1 block text-sm font-medium">
+                  Подкатегория *
                 </label>
 
                 <select
@@ -594,25 +541,54 @@ export default function NewProductPage() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-purple-500"
                 >
-                  {(
-                    subcategories[
-                      category
-                    ] ?? []
-                  ).map((item) => (
-                    <option
-                      key={item.value}
-                      value={item.value}
-                    >
-                      {item.label}
-                    </option>
-                  ))}
+                  {currentSubcategories.map(
+                    (item) => (
+                      <option
+                        key={item.value}
+                        value={item.value}
+                      >
+                        {item.label}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Цена, грн *
+                </label>
+
+                <input
+                  value={price}
+                  onChange={(e) =>
+                    setPrice(e.target.value)
+                  }
+                  inputMode="decimal"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-purple-500"
+                  placeholder="1200"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Магазин / поставщик
+                </label>
+
+                <input
+                  value={storeName}
+                  onChange={(e) =>
+                    setStoreName(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-purple-500"
+                  placeholder="AGER"
+                />
+              </div>
+
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Описание
                 </label>
 
@@ -624,22 +600,68 @@ export default function NewProductPage() {
                     )
                   }
                   rows={5}
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-purple-500"
                   placeholder="Описание товара..."
                 />
               </div>
             </div>
           </section>
 
-          {/* ХАРАКТЕРИСТИКИ */}
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="mb-5 text-xl font-bold">
-              Характеристики товара
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-xl font-bold text-purple-950">
+              Фотографии
+            </h2>
+
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFilesChange}
+              className="block w-full rounded-xl border border-gray-300 p-3"
+            />
+
+            {files.length > 0 && (
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                {files.map((item, index) => (
+                  <div
+                    key={`${item.file.name}-${index}`}
+                    className="relative overflow-hidden rounded-xl border bg-gray-50"
+                  >
+                    <img
+                      src={item.preview}
+                      alt={`Фото ${index + 1}`}
+                      className="h-40 w-full object-cover"
+                    />
+
+                    {index === 0 && (
+                      <div className="absolute left-2 top-2 rounded-lg bg-purple-700 px-2 py-1 text-xs font-semibold text-white">
+                        Главное
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeFile(index)
+                      }
+                      className="absolute right-2 top-2 rounded-full bg-white px-2 py-1 text-sm font-bold text-red-600 shadow"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-xl font-bold text-purple-950">
+              Характеристики
             </h2>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Бренд
                 </label>
 
@@ -648,28 +670,28 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setBrand(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="AGER"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Материал
                 </label>
 
                 <input
                   value={material}
                   onChange={(e) =>
-                    setMaterial(
-                      e.target.value
-                    )
+                    setMaterial(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Полиэстер"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Цвет
                 </label>
 
@@ -678,12 +700,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setColor(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Черный"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Сезон
                 </label>
 
@@ -692,12 +715,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setSeason(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Демисезон"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Стиль
                 </label>
 
@@ -706,12 +730,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setStyle(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Классический"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Пол
                 </label>
 
@@ -720,13 +745,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setGender(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
                   placeholder="Женский"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Страна
                 </label>
 
@@ -735,12 +760,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setCountry(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Украина"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Состав
                 </label>
 
@@ -751,12 +777,13 @@ export default function NewProductPage() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="100% полиэстер"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Размерная группа
                 </label>
 
@@ -767,13 +794,13 @@ export default function NewProductPage() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
-                  placeholder="XS–XL"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="S-M"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Рукав
                 </label>
 
@@ -782,12 +809,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setSleeve(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Длинный"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Длина
                 </label>
 
@@ -796,12 +824,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setLength(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Средняя"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Вырез
                 </label>
 
@@ -812,28 +841,28 @@ export default function NewProductPage() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Круглый"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Застёжка
+                <label className="mb-1 block text-sm font-medium">
+                  Застежка
                 </label>
 
                 <input
                   value={closure}
                   onChange={(e) =>
-                    setClosure(
-                      e.target.value
-                    )
+                    setClosure(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Молния"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Посадка
                 </label>
 
@@ -842,12 +871,13 @@ export default function NewProductPage() {
                   onChange={(e) =>
                     setFit(e.target.value)
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Свободная"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium">
                   Особенности ткани
                 </label>
 
@@ -858,50 +888,50 @@ export default function NewProductPage() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                  placeholder="Эластичная"
                 />
               </div>
             </div>
           </section>
 
-          {/* ЗАМЕРЫ */}
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center justify-between gap-4">
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold">
+                <h2 className="text-xl font-bold text-purple-950">
                   Замеры изделия
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-500">
-                  Размеры можно добавить для одежды.
+                  Добавь размеры, если они есть у товара.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={addMeasurement}
-                className="rounded-2xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
+                className="rounded-xl bg-purple-100 px-4 py-2 font-medium text-purple-800 hover:bg-purple-200"
               >
                 + Добавить размер
               </button>
             </div>
 
             {measurements.length === 0 ? (
-              <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-500">
-                Замеров пока нет.
-              </div>
+              <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
+                Замеры пока не добавлены.
+              </p>
             ) : (
               <div className="space-y-4">
                 {measurements.map(
                   (row, index) => (
                     <div
                       key={index}
-                      className="rounded-2xl border border-gray-200 p-4"
+                      className="rounded-xl border border-gray-200 p-4"
                     >
                       <div className="mb-3 flex items-center justify-between">
-                        <div className="font-semibold">
-                          Размер
-                        </div>
+                        <span className="font-semibold text-purple-900">
+                          Размер {index + 1}
+                        </span>
 
                         <button
                           type="button"
@@ -910,108 +940,77 @@ export default function NewProductPage() {
                               index
                             )
                           }
-                          className="text-sm text-red-600 hover:underline"
+                          className="text-sm font-medium text-red-600"
                         >
                           Удалить
                         </button>
                       </div>
 
-                      <div className="grid gap-3 md:grid-cols-5">
-                        <div>
-                          <label className="mb-1 block text-xs text-gray-500">
-                            Размер
-                          </label>
+                      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                        <input
+                          value={row.size}
+                          onChange={(e) =>
+                            updateMeasurement(
+                              index,
+                              "size",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Размер"
+                          className="rounded-xl border border-gray-300 px-3 py-2"
+                        />
 
-                          <input
-                            value={row.size}
-                            onChange={(e) =>
-                              updateMeasurement(
-                                index,
-                                "size",
-                                e.target.value
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-purple-500"
-                          />
-                        </div>
+                        <input
+                          value={row.bust_cm}
+                          onChange={(e) =>
+                            updateMeasurement(
+                              index,
+                              "bust_cm",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Грудь, см"
+                          className="rounded-xl border border-gray-300 px-3 py-2"
+                        />
 
-                        <div>
-                          <label className="mb-1 block text-xs text-gray-500">
-                            Грудь
-                          </label>
+                        <input
+                          value={row.waist_cm}
+                          onChange={(e) =>
+                            updateMeasurement(
+                              index,
+                              "waist_cm",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Талия, см"
+                          className="rounded-xl border border-gray-300 px-3 py-2"
+                        />
 
-                          <input
-                            value={row.bust_cm}
-                            onChange={(e) =>
-                              updateMeasurement(
-                                index,
-                                "bust_cm",
-                                e.target.value
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-purple-500"
-                          />
-                        </div>
+                        <input
+                          value={row.hips_cm}
+                          onChange={(e) =>
+                            updateMeasurement(
+                              index,
+                              "hips_cm",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Бёдра, см"
+                          className="rounded-xl border border-gray-300 px-3 py-2"
+                        />
 
-                        <div>
-                          <label className="mb-1 block text-xs text-gray-500">
-                            Талия
-                          </label>
-
-                          <input
-                            value={row.waist_cm}
-                            onChange={(e) =>
-                              updateMeasurement(
-                                index,
-                                "waist_cm",
-                                e.target.value
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-purple-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-xs text-gray-500">
-                            Бёдра
-                          </label>
-
-                          <input
-                            value={row.hips_cm}
-                            onChange={(e) =>
-                              updateMeasurement(
-                                index,
-                                "hips_cm",
-                                e.target.value
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-purple-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-xs text-gray-500">
-                            Длина
-                          </label>
-
-                          <input
-                            value={row.length_cm}
-                            onChange={(e) =>
-                              updateMeasurement(
-                                index,
-                                "length_cm",
-                                e.target.value
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-purple-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-3 max-w-xs">
-                        <label className="mb-1 block text-xs text-gray-500">
-                          Рукав
-                        </label>
+                        <input
+                          value={row.length_cm}
+                          onChange={(e) =>
+                            updateMeasurement(
+                              index,
+                              "length_cm",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Длина, см"
+                          className="rounded-xl border border-gray-300 px-3 py-2"
+                        />
 
                         <input
                           value={row.sleeve_cm}
@@ -1022,7 +1021,8 @@ export default function NewProductPage() {
                               e.target.value
                             )
                           }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-purple-500"
+                          placeholder="Рукав, см"
+                          className="rounded-xl border border-gray-300 px-3 py-2"
                         />
                       </div>
                     </div>
@@ -1032,99 +1032,75 @@ export default function NewProductPage() {
             )}
           </section>
 
-          {/* ФОТОГРАФИИ */}
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="mb-2 text-xl font-bold">
-              Фотографии товара
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-xl font-bold text-purple-950">
+              Наличие
             </h2>
 
-            <p className="mb-5 text-sm text-gray-500">
-              Можно выбрать несколько фотографий.
-              Первое фото станет главным.
-            </p>
-
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageChange}
-              className="mb-5 block w-full rounded-2xl border border-gray-200 p-3"
-            />
-
-            {selectedFiles.length === 0 ? (
-              <div className="rounded-2xl bg-gray-50 p-5 text-sm text-gray-500">
-                Фотографии пока не выбраны.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                {selectedFiles.map(
-                  (image, index) => (
-                    <div
-                      key={`${image.preview}-${index}`}
-                      className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50"
-                    >
-                      <img
-                        src={image.preview}
-                        alt={`Фото ${index + 1}`}
-                        className="aspect-square w-full object-cover"
-                      />
-
-                      <div className="flex items-center justify-between gap-2 p-2">
-                        <span className="text-xs text-gray-500">
-                          Фото {index + 1}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeImage(index)
-                          }
-                          className="text-xs text-red-600 hover:underline"
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* СОХРАНЕНИЕ */}
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <div className="font-semibold">
-                  Новый товар
-                </div>
+                <label className="mb-1 block text-sm font-medium">
+                  Количество
+                </label>
 
-                <div className="text-sm text-gray-500">
-                  Наличие автоматически определяется
-                  по количеству.
-                </div>
+                <input
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(e.target.value)
+                  }
+                  type="number"
+                  min="0"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3"
+                />
               </div>
 
-              <div className="flex gap-3">
-                <Link
-                  href="/admin/products"
-                  className="rounded-2xl border border-gray-200 px-5 py-3 font-semibold hover:bg-gray-50"
-                >
-                  Отмена
-                </Link>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 p-4">
+                <input
+                  type="checkbox"
+                  checked={isAvailable}
+                  onChange={(e) =>
+                    setIsAvailable(
+                      e.target.checked
+                    )
+                  }
+                  className="h-5 w-5"
+                />
 
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-2xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving
-                    ? "Добавление..."
-                    : "Добавить товар"}
-                </button>
-              </div>
+                <span>
+                  <span className="block font-medium">
+                    Товар доступен для покупки
+                  </span>
+
+                  <span className="text-sm text-gray-500">
+                    Если выключить, товар будет
+                    отображаться как недоступный.
+                  </span>
+                </span>
+              </label>
             </div>
           </section>
+
+          {error && (
+            <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="rounded-xl bg-green-50 p-4 text-sm text-green-700">
+              {message}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-2xl bg-purple-700 px-5 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading
+              ? "Добавляем товар..."
+              : "Добавить товар"}
+          </button>
         </form>
       </div>
     </main>
