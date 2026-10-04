@@ -129,6 +129,7 @@ export default function NewProductPage() {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [storeName, setStoreName] = useState("");
+
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
   const [color, setColor] = useState("");
@@ -184,6 +185,8 @@ export default function NewProductPage() {
     );
 
     setFiles((prev) => [...prev, ...newFiles]);
+
+    event.target.value = "";
   }
 
   function removeFile(index: number) {
@@ -612,12 +615,28 @@ export default function NewProductPage() {
               Фотографии
             </h2>
 
+            <label
+              htmlFor="product-images"
+              className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-purple-300 bg-purple-50 px-5 py-7 text-center transition hover:bg-purple-100"
+            >
+              <span>
+                <span className="block text-lg font-bold text-purple-800">
+                  📷 Добавить фото
+                </span>
+
+                <span className="mt-1 block text-sm text-gray-500">
+                  Можно выбрать несколько фотографий
+                </span>
+              </span>
+            </label>
+
             <input
+              id="product-images"
               type="file"
               accept="image/*"
               multiple
               onChange={handleFilesChange}
-              className="block w-full rounded-xl border border-gray-300 p-3"
+              className="hidden"
             />
 
             {files.length > 0 && (
