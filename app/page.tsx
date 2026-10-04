@@ -163,8 +163,16 @@ export default function Home() {
     };
   }, []);
 
-  function loadCartCount() {
-    const savedCart = localStorage.getItem("kona-cart");
+  async function loadCartCount() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const cartKey = user
+      ? `kona-cart-${user.id}`
+      : "kona-cart-guest";
+
+    const savedCart = localStorage.getItem(cartKey);
 
     if (!savedCart) {
       setCartCount(0);
@@ -637,19 +645,6 @@ export default function Home() {
       category = "Аксессуары";
     }
 
-    /*
-     * Бюджет без конкретной категории.
-     *
-     * Например:
-     * "есть какие-то варианты с бюджетом 2000"
-     * "что есть до 2000"
-     * "что можно найти в пределах 1500"
-     *
-     * Здесь показываем весь каталог в заданном бюджете.
-     * Этот блок стоит ДО приветствия и общего ответа,
-     * поэтому KONA больше не скажет "не совсем поняла",
-     * если бюджет был понятен.
-     */
     if (maxPrice !== null && !productType && category === "Все") {
       const filtered = products.filter((product) =>
         isExactPrice
@@ -1077,7 +1072,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Навигация компьютера */}
           <div className="hidden items-center gap-6 text-sm font-medium md:flex">
             <a href="/" className="cursor-pointer">
               Главная
@@ -1112,7 +1106,6 @@ export default function Home() {
             </a>
           </div>
 
-          {/* Мобильная навигация */}
           <div className="flex items-center gap-2 md:hidden">
             <a
               href="/cart"
@@ -1144,7 +1137,6 @@ export default function Home() {
             </a>
           </div>
 
-          {/* Кнопка входа компьютера */}
           <a
             href="/login"
             className="hidden cursor-pointer rounded-full bg-purple-100 px-4 py-2 text-sm font-semibold text-purple-700 md:block"

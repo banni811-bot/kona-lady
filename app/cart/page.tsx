@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { supabase } from "../../lib/supabase";
 type CartItem = {
   id: string;
   name: string;
@@ -14,7 +14,16 @@ export default function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("kona-cart");
+  async function loadCart() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const cartKey = user
+      ? `kona-cart-${user.id}`
+      : "kona-cart-guest";
+
+    const savedCart = localStorage.getItem(cartKey);
 
     if (savedCart) {
       try {
@@ -22,13 +31,29 @@ export default function CartPage() {
       } catch {
         setCart([]);
       }
+    } else {
+      setCart([]);
     }
-  }, []);
-
-  function updateCart(updatedCart: CartItem[]) {
-    setCart(updatedCart);
-    localStorage.setItem("kona-cart", JSON.stringify(updatedCart));
   }
+
+  loadCart();
+}, []);
+  async function updateCart(updatedCart: CartItem[]) {
+  setCart(updatedCart);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const cartKey = user
+    ? `kona-cart-${user.id}`
+    : "kona-cart-guest";
+
+  localStorage.setItem(
+    cartKey,
+    JSON.stringify(updatedCart),
+  );
+}
 
   function increaseQuantity(id: string) {
     const updatedCart = cart.map((item) =>

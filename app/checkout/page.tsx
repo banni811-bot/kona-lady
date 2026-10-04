@@ -29,8 +29,17 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    const savedCart = localStorage.getItem("kona-cart");
+ useEffect(() => {
+  async function loadCart() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const cartKey = user
+      ? `kona-cart-${user.id}`
+      : "kona-cart-guest";
+
+    const savedCart = localStorage.getItem(cartKey);
 
     if (savedCart) {
       try {
@@ -38,8 +47,13 @@ export default function CheckoutPage() {
       } catch {
         setCart([]);
       }
+    } else {
+      setCart([]);
     }
-  }, []);
+  }
+
+  loadCart();
+}, []);
 
   const total = cart.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -270,7 +284,15 @@ export default function CheckoutPage() {
        * Остальные способы оплаты работают
        * как и раньше.
        */
-      localStorage.removeItem("kona-cart");
+      const {
+  data: { user: currentUser },
+} = await supabase.auth.getUser();
+
+const cartKey = currentUser
+  ? `kona-cart-${currentUser.id}`
+  : "kona-cart-guest";
+
+localStorage.removeItem(cartKey);
 
       setCart([]);
 

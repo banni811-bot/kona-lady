@@ -305,67 +305,63 @@ export default function ProductPage() {
     setFavoriteLoading(false);
   }
 
-  function addToCart() {
-    if (!product) {
-      return;
-    }
+ async function addToCart() {
+  if (!product) return;
 
-    if (product.is_available === false) {
-      setMessage("Этот товар сейчас нет в наличии.");
-      return;
-    }
-
-    const savedCart = localStorage.getItem("kona-cart");
-
-    let cart: CartItem[] = [];
-
-    if (savedCart) {
-      try {
-        cart = JSON.parse(savedCart);
-      } catch {
-        cart = [];
-      }
-    }
-
-    const productIdString = String(product.id);
-
-    const existingItem = cart.find(
-      (item) => item.id === productIdString,
-    );
-
-    let updatedCart: CartItem[];
-
-    if (existingItem) {
-      updatedCart = cart.map((item) =>
-        item.id === productIdString
-          ? {
-              ...item,
-              quantity: item.quantity + 1,
-            }
-          : item,
-      );
-    } else {
-      updatedCart = [
-        ...cart,
-        {
-          id: productIdString,
-          name: product.name,
-          price: Number(product.price_uah || 0),
-          emoji: "🛍️",
-          quantity: 1,
-        },
-      ];
-    }
-
-    localStorage.setItem(
-      "kona-cart",
-      JSON.stringify(updatedCart),
-    );
-
-    window.dispatchEvent(new Event("kona-cart-updated"));
-
-    setMessage("Товар добавлен в корзину 🛒");
+  if (product.is_available === false) {
+    setMessage("Этот товар сейчас нет в наличии.");
+    return;
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const cartKey = user ? `kona-cart-${user.id}` : "kona-cart-guest";
+
+  const savedCart = localStorage.getItem(cartKey);
+  let cart: CartItem[] = [];
+
+  if (savedCart) {
+    try {
+      cart = JSON.parse(savedCart);
+    } catch {
+      cart = [];
+    }
+  }
+
+  const productIdString = String(product.id);
+
+  const existingItem = cart.find(
+    (item) => item.id === productIdString,
+  );
+
+  let updatedCart: CartItem[];
+
+  if (existingItem) {
+    updatedCart = cart.map((item) =>
+      item.id === productIdString
+        ? { ...item, quantity: item.quantity + 1 }
+        : item,
+    );
+  } else {
+    updatedCart = [
+      ...cart,
+      {
+        id: productIdString,
+        name: product.name,
+        price: Number(product.price_uah || 0),
+        emoji: "🛍️",
+        quantity: 1,
+      },
+    ];
+  }
+
+  localStorage.setItem(cartKey, JSON.stringify(updatedCart));
+  window.dispatchEvent(new Event("kona-cart-updated"));
+
+  setMessage("Товар добавлен в корзину 🛒");
+}
 
   async function submitReview() {
     setMessage("");
