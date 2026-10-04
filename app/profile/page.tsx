@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -85,6 +86,21 @@ export default function ProfilePage() {
     setMessage("Профиль сохранён! ✦");
   }
 
+  async function handleLogout() {
+    setLoggingOut(true);
+    setError("");
+
+    const { error: logoutError } = await supabase.auth.signOut();
+
+    if (logoutError) {
+      setError(logoutError.message);
+      setLoggingOut(false);
+      return;
+    }
+
+    window.location.assign("/");
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f7f3ff] p-6 text-zinc-900">
@@ -119,12 +135,23 @@ export default function ProfilePage() {
     <main className="min-h-screen bg-[#f7f3ff] px-4 py-8 text-zinc-900">
       <div className="mx-auto max-w-2xl">
         <div className="mb-6">
-          <a
-            href="/"
-            className="inline-flex rounded-2xl bg-white px-4 py-2 text-sm font-bold text-purple-700 shadow-sm transition hover:bg-purple-50"
-          >
-            ← Вернуться в магазин
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/"
+              className="inline-flex rounded-2xl bg-white px-4 py-2 text-sm font-bold text-purple-700 shadow-sm transition hover:bg-purple-50"
+            >
+              ← Вернуться в магазин
+            </a>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="inline-flex rounded-2xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loggingOut ? "Выходим..." : "Выйти"}
+            </button>
+          </div>
 
           <div className="mt-5 text-3xl font-black text-purple-700">
             ✦ KONA LADY
