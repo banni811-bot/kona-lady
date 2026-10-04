@@ -16,6 +16,63 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  function getFriendlyError(errorMessage: string) {
+    const text = errorMessage.toLowerCase();
+
+    if (
+      text.includes("user already registered") ||
+      text.includes("already registered") ||
+      text.includes("already exists")
+    ) {
+      return "Пользователь с таким email уже зарегистрирован. Попробуйте войти в аккаунт.";
+    }
+
+    if (
+      text.includes("invalid login credentials") ||
+      text.includes("invalid credentials")
+    ) {
+      return "Неверный email или пароль. Проверьте данные и попробуйте ещё раз.";
+    }
+
+    if (
+      text.includes("email not confirmed") ||
+      text.includes("email_not_confirmed")
+    ) {
+      return "Ваша почта ещё не подтверждена. Откройте письмо от KONA LADY и подтвердите регистрацию.";
+    }
+
+    if (
+      text.includes("password should be at least") ||
+      text.includes("password must be at least")
+    ) {
+      return "Пароль должен содержать минимум 6 символов.";
+    }
+
+    if (
+      text.includes("invalid email") ||
+      text.includes("unable to validate email")
+    ) {
+      return "Введите корректный адрес электронной почты.";
+    }
+
+    if (
+      text.includes("rate limit") ||
+      text.includes("too many requests")
+    ) {
+      return "Слишком много попыток. Немного подождите и попробуйте снова.";
+    }
+
+    if (
+      text.includes("network") ||
+      text.includes("fetch") ||
+      text.includes("failed to fetch")
+    ) {
+      return "Не удалось соединиться с сервером. Проверьте интернет и попробуйте ещё раз.";
+    }
+
+    return "Не удалось выполнить операцию. Проверьте введённые данные и попробуйте ещё раз.";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -37,11 +94,14 @@ export default function LoginPage() {
         password,
         options: {
           emailRedirectTo: redirectUrl,
+          data: {
+            name: name || null,
+          },
         },
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        setError(getFriendlyError(signUpError.message));
         setLoading(false);
         return;
       }
@@ -49,28 +109,30 @@ export default function LoginPage() {
       if (signUpData.user) {
         const { error: profileError } = await supabase
           .from("profiles")
-          .insert({
+          .upsert({
             id: signUpData.user.id,
             name: name || null,
           });
 
         if (profileError) {
-          setError(profileError.message);
+          setError(
+            "Аккаунт создан, но данные профиля не удалось сохранить. Попробуйте войти позже."
+          );
           setLoading(false);
           return;
         }
       }
 
       setMessage(
-        `📧 Проверьте свою почту!
+        `📧 Письмо отправлено!
 
-Мы отправили письмо с подтверждением на ${email}.
+Мы отправили письмо для подтверждения регистрации на ${email}.
 
 Откройте письмо от KONA LADY и нажмите ссылку для подтверждения регистрации.
 
 Если письма нет — проверьте папку «Спам».
 
-После подтверждения почты вы сможете войти в свой аккаунт.`
+После подтверждения почты вернитесь на сайт и войдите в свой аккаунт.`
       );
 
       setLoading(false);
@@ -84,7 +146,7 @@ export default function LoginPage() {
       });
 
     if (loginError) {
-      setError(loginError.message);
+      setError(getFriendlyError(loginError.message));
       setLoading(false);
       return;
     }
@@ -101,7 +163,7 @@ export default function LoginPage() {
       return;
     }
 
-   window.location.assign("/profile");
+    window.location.assign("/profile");
   }
 
   return (
