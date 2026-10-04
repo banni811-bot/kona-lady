@@ -901,10 +901,10 @@ export default function Home() {
       setAiAnswer(
         filtered.length > 0
           ? isExactPrice
-            ? `Для работы нашла ${filtered.length} вариант(а) ровно за ${maxPrice} грн 👗`
+            ? `Для работы нашла ${filtered.length} вариант(а) ровно за ${maxPrice} грн 💜`
             : maxPrice !== null
-              ? `Для работы нашла ${filtered.length} вариант(а) до ${maxPrice} грн 👗`
-              : `Для работы нашла ${filtered.length} подходящий вариант(а) 👗`
+              ? `Для работы нашла ${filtered.length} вариант(а) до ${maxPrice} грн 💜`
+              : `Для работы нашла ${filtered.length} подходящий вариант(а) 💜`
           : "Пока не нашла подходящих вариантов для работы.",
       );
 
@@ -1066,17 +1066,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f3ff] text-zinc-900">
       <header className="border-b border-purple-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-4 md:px-8">
-          <div>
-            <div className="text-2xl font-black tracking-tight text-purple-700">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3 px-4 py-3 md:px-8 md:py-4">
+          <div className="min-w-0">
+            <div className="text-xl font-black tracking-tight text-purple-700 md:text-2xl">
               ✦ KONA LADY
             </div>
 
-            <div className="text-xs text-zinc-500">
+            <div className="hidden text-xs text-zinc-500 sm:block">
               Начни свой стиль с KONA
             </div>
           </div>
 
+          {/* Навигация компьютера */}
           <div className="hidden items-center gap-6 text-sm font-medium md:flex">
             <a href="/" className="cursor-pointer">
               Главная
@@ -1111,9 +1112,42 @@ export default function Home() {
             </a>
           </div>
 
+          {/* Мобильная навигация */}
+          <div className="flex items-center gap-2 md:hidden">
+            <a
+              href="/cart"
+              aria-label="Корзина"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-lg text-purple-700 transition hover:bg-purple-100"
+            >
+              🛒
+
+              {cartCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-purple-600 px-1 text-[10px] font-bold text-white">
+                  {cartCount}
+                </span>
+              )}
+            </a>
+
+            <a
+              href="/profile"
+              aria-label="Профиль"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 text-lg text-purple-700 transition hover:bg-purple-100"
+            >
+              👤
+            </a>
+
+            <a
+              href="/login"
+              className="rounded-full bg-purple-100 px-3 py-2 text-xs font-semibold text-purple-700"
+            >
+              Войти
+            </a>
+          </div>
+
+          {/* Кнопка входа компьютера */}
           <a
             href="/login"
-            className="cursor-pointer rounded-full bg-purple-100 px-4 py-2 text-sm font-semibold text-purple-700"
+            className="hidden cursor-pointer rounded-full bg-purple-100 px-4 py-2 text-sm font-semibold text-purple-700 md:block"
           >
             Войти
           </a>
