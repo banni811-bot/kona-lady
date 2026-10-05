@@ -16,6 +16,7 @@ export default function CheckoutPage() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [region, setRegion] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
 
@@ -29,31 +30,31 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
- useEffect(() => {
-  async function loadCart() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  useEffect(() => {
+    async function loadCart() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    const cartKey = user
-      ? `kona-cart-${user.id}`
-      : "kona-cart-guest";
+      const cartKey = user
+        ? `kona-cart-${user.id}`
+        : "kona-cart-guest";
 
-    const savedCart = localStorage.getItem(cartKey);
+      const savedCart = localStorage.getItem(cartKey);
 
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch {
+      if (savedCart) {
+        try {
+          setCart(JSON.parse(savedCart));
+        } catch {
+          setCart([]);
+        }
+      } else {
         setCart([]);
       }
-    } else {
-      setCart([]);
     }
-  }
 
-  loadCart();
-}, []);
+    loadCart();
+  }, []);
 
   const total = cart.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -167,11 +168,12 @@ export default function CheckoutPage() {
     if (
       !name.trim() ||
       !phone.trim() ||
+      !region.trim() ||
       !city.trim() ||
       !address.trim()
     ) {
       setMessage(
-        "Заполните имя, телефон, город и данные доставки.",
+        "Заполните имя, телефон, область, город и данные доставки.",
       );
       return;
     }
@@ -204,9 +206,17 @@ export default function CheckoutPage() {
 
             customer_name: name.trim(),
             customer_phone: phone.trim(),
+            customer_email: user.email || null,
 
             delivery_method: deliveryMethod,
+            delivery_region: region.trim(),
             delivery_city: city.trim(),
+
+            // Новое поле для области/отделения.
+            delivery_branch: address.trim(),
+
+            // Оставляем старое поле тоже,
+            // чтобы не сломать существующую веб-логику.
             delivery_address: address.trim(),
 
             payment_method: paymentMethod,
@@ -285,14 +295,14 @@ export default function CheckoutPage() {
        * как и раньше.
        */
       const {
-  data: { user: currentUser },
-} = await supabase.auth.getUser();
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
 
-const cartKey = currentUser
-  ? `kona-cart-${currentUser.id}`
-  : "kona-cart-guest";
+      const cartKey = currentUser
+        ? `kona-cart-${currentUser.id}`
+        : "kona-cart-guest";
 
-localStorage.removeItem(cartKey);
+      localStorage.removeItem(cartKey);
 
       setCart([]);
 
@@ -453,6 +463,7 @@ localStorage.removeItem(cartKey);
                 </div>
 
                 {/* ДОСТАВКА */}
+
                 <div>
                   <label className="mb-3 block text-sm font-medium">
                     🚚 Способ доставки
@@ -572,6 +583,25 @@ localStorage.removeItem(cartKey);
                   </div>
                 </div>
 
+                {/* ОБЛАСТЬ */}
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Область
+                  </label>
+
+                  <input
+                    value={region}
+                    onChange={(e) =>
+                      setRegion(e.target.value)
+                    }
+                    placeholder="Например, Одесская область"
+                    className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                {/* ГОРОД */}
+
                 <div>
                   <label className="mb-2 block text-sm font-medium">
                     Город
@@ -586,6 +616,8 @@ localStorage.removeItem(cartKey);
                     className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-purple-500"
                   />
                 </div>
+
+                {/* ОТДЕЛЕНИЕ / АДРЕС */}
 
                 <div>
                   <label className="mb-2 block text-sm font-medium">
@@ -604,6 +636,7 @@ localStorage.removeItem(cartKey);
                 </div>
 
                 {/* ОПЛАТА */}
+
                 <div className="pt-2">
                   <label className="mb-3 block text-sm font-medium">
                     💳 Способ оплаты
@@ -611,6 +644,7 @@ localStorage.removeItem(cartKey);
 
                   <div className="space-y-3">
                     {/* НАЛОЖЕННЫЙ ПЛАТЁЖ */}
+
                     <label
                       className={`block cursor-pointer rounded-2xl border p-4 transition ${
                         paymentMethod ===
@@ -652,6 +686,7 @@ localStorage.removeItem(cartKey);
                     </label>
 
                     {/* ОПЛАТА КАРТОЙ */}
+
                     <label
                       className={`block cursor-pointer rounded-2xl border p-4 transition ${
                         paymentMethod ===
@@ -693,6 +728,7 @@ localStorage.removeItem(cartKey);
                     </label>
 
                     {/* GOOGLE PAY / APPLE PAY */}
+
                     <label
                       className={`block cursor-pointer rounded-2xl border p-4 transition ${
                         paymentMethod ===
@@ -734,6 +770,7 @@ localStorage.removeItem(cartKey);
                     </label>
 
                     {/* РЕКВИЗИТЫ */}
+
                     <label
                       className={`block cursor-pointer rounded-2xl border p-4 transition ${
                         paymentMethod ===
@@ -780,6 +817,7 @@ localStorage.removeItem(cartKey);
                     <div className="mt-3 rounded-2xl bg-purple-50 p-4 text-sm text-purple-800">
                       🔒 Тестовая безопасная оплата
                       картой через LiqPay.
+
                       <div className="mt-1 text-purple-600">
                         Сейчас используется тестовый
                         режим. Реальные деньги не
@@ -792,6 +830,7 @@ localStorage.removeItem(cartKey);
                     "Google Pay / Apple Pay" && (
                     <div className="mt-3 rounded-2xl bg-purple-50 p-4 text-sm text-purple-800">
                       🔒 Быстрая и безопасная оплата.
+
                       <div className="mt-1 text-purple-600">
                         Этот способ подключим через
                         платёжную систему после
@@ -804,6 +843,7 @@ localStorage.removeItem(cartKey);
                     "Оплата по реквизитам" && (
                     <div className="mt-3 rounded-2xl bg-purple-50 p-4 text-sm text-purple-800">
                       🏦 Оплата банковским переводом.
+
                       <div className="mt-1 text-purple-600">
                         Реквизиты для оплаты будут
                         показаны после подключения
