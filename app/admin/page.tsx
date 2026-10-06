@@ -428,6 +428,49 @@ export default function AdminPage() {
             </Link>
 
             <Link
+              href="/manager"
+              style={{
+                textDecoration: "none",
+                color: "inherit",
+                background: "#ffffff",
+                border: "2px solid #cbbddd",
+                borderRadius: "20px",
+                padding: "24px",
+                boxShadow:
+                  "0 6px 20px rgba(80, 50, 120, 0.10)",
+                display: "block",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "36px",
+                  marginBottom: "12px",
+                }}
+              >
+                📊
+              </div>
+
+              <h3
+                style={{
+                  fontSize: "20px",
+                  margin: "0 0 8px",
+                }}
+              >
+                KONA MANAGER
+              </h3>
+
+              <p
+                style={{
+                  margin: 0,
+                  color: "#75677f",
+                  lineHeight: 1.5,
+                }}
+              >
+                Отчёты, бухгалтерия, продажи, клиенты и остатки
+              </p>
+            </Link>
+
+            <Link
               href="/"
               style={{
                 textDecoration: "none",
