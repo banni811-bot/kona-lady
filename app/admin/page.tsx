@@ -427,19 +427,19 @@ export default function AdminPage() {
               </p>
             </Link>
 
-            <Link
-              href="/manager"
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-                background: "#ffffff",
-                border: "2px solid #cbbddd",
-                borderRadius: "20px",
-                padding: "24px",
-                boxShadow:
-                  "0 6px 20px rgba(80, 50, 120, 0.10)",
-                display: "block",
-              }}
+           <Link
+  href="/admin/manager"
+  style={{
+    textDecoration: "none",
+    color: "inherit",
+    background: "#ffffff",
+    border: "2px solid #cbbddd",
+    borderRadius: "20px",
+    padding: "24px",
+    boxShadow:
+      "0 6px 20px rgba(80, 50, 120, 0.10)",
+    display: "block",
+  }}
             >
               <div
                 style={{
