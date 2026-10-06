@@ -21,6 +21,7 @@ export default function ProfilePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -101,6 +102,64 @@ export default function ProfilePage() {
     window.location.assign("/");
   }
 
+  async function handleDeleteAccount() {
+    if (deletingAccount) return;
+
+    const confirmed = window.confirm(
+      "Вы действительно хотите удалить аккаунт?\n\n" +
+        "Будут удалены ваш профиль, избранное, покупки, заказы и другие данные, связанные с аккаунтом.\n\n" +
+        "Это действие нельзя отменить.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingAccount(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setError("Сессия закончилась. Войдите в аккаунт снова.");
+        setDeletingAccount(false);
+        return;
+      }
+
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setError(
+          result?.error || "Не удалось удалить аккаунт. Попробуйте ещё раз.",
+        );
+        setDeletingAccount(false);
+        return;
+      }
+
+      await supabase.auth.signOut();
+
+      window.location.assign("/");
+    } catch (deleteError) {
+      console.error("Account deletion error:", deleteError);
+
+      setError(
+        "Не удалось удалить аккаунт. Проверьте подключение и попробуйте ещё раз.",
+      );
+      setDeletingAccount(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f7f3ff] p-6 text-zinc-900">
@@ -146,7 +205,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleLogout}
-              disabled={loggingOut}
+              disabled={loggingOut || deletingAccount}
               className="inline-flex rounded-2xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loggingOut ? "Выходим..." : "Выйти"}
@@ -355,11 +414,34 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={saveProfile}
-                className="w-full rounded-2xl bg-purple-600 px-5 py-4 font-bold text-white transition hover:bg-purple-700"
+                disabled={deletingAccount}
+                className="w-full rounded-2xl bg-purple-600 px-5 py-4 font-bold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Сохранить профиль
               </button>
             </div>
+          </div>
+
+          <div className="mt-10 border-t border-red-100 pt-8">
+            <div className="text-xl font-black text-red-700">
+              Удаление аккаунта
+            </div>
+
+            <div className="mt-2 text-sm leading-6 text-zinc-500">
+              Вы можете навсегда удалить свой аккаунт и связанные с ним
+              данные. Это действие нельзя отменить.
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDeleteAccount}
+              disabled={deletingAccount || loggingOut}
+              className="mt-5 w-full rounded-2xl border border-red-200 bg-red-50 px-5 py-4 font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {deletingAccount
+                ? "Удаляем аккаунт..."
+                : "Удалить аккаунт"}
+            </button>
           </div>
         </section>
       </div>
