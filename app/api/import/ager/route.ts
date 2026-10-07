@@ -1,50 +1,9 @@
 import { XMLParser } from "fast-xml-parser";
-import * as XLSX from "xlsx";
-
-const XLS_URL =
-  "http://ager.ua/download/ager_actual_price_and_stock.xls";
 
 const XML_URL =
   "http://ager.ua/download/catalog_ua.xml";
 
-function normalize(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function getBaseArticle(value: unknown): string {
-  const text = String(value ?? "").trim();
-
-  if (!text) {
-    return "";
-  }
-
-  // Пример:
-  // Cвитер мужской новогодний 214R21302_Джинс
-  // ↓
-  // 214R21302
-  const beforeColor = text.split("_")[0].trim();
-
-  const parts = beforeColor.split(/\s+/).filter(Boolean);
-
-  if (!parts.length) {
-    return "";
-  }
-
-  // Ищем последний фрагмент, похожий на артикул:
-  // содержит хотя бы одну цифру
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const part = parts[i].trim();
-
-    if (/\d/.test(part)) {
-      return part;
-    }
-  }
-
-  return "";
-}
+const TEST_GROUP_ID = "138845";
 
 function getParam(
   offer: any,
@@ -56,186 +15,77 @@ function getParam(
       ? [offer.param]
       : [];
 
-  const normalizedNames = names.map(normalize);
-
   for (const param of params) {
-    const name = normalize(param?.["@_name"]);
+    const name = String(param?.["@_name"] ?? "")
+      .trim()
+      .toLowerCase();
 
-    if (normalizedNames.includes(name)) {
-      return String(param?.["#text"] ?? param ?? "").trim();
+    for (const target of names) {
+      if (name === target.trim().toLowerCase()) {
+        return String(
+          param?.["#text"] ?? param ?? ""
+        ).trim();
+      }
     }
   }
 
   return "";
 }
 
-function getStock(offer: any): number | null {
-  const value = offer?.quantity_in_stock;
-
-  if (value === undefined || value === null || value === "") {
-    return null;
+function getPictures(offer: any): string[] {
+  if (Array.isArray(offer?.picture)) {
+    return offer.picture
+      .map((item: any) => String(item).trim())
+      .filter(Boolean);
   }
 
-  const number = Number(value);
+  if (offer?.picture) {
+    return [String(offer.picture).trim()];
+  }
 
-  return Number.isFinite(number) ? number : null;
+  return [];
+}
+
+function getStock(offer: any): number {
+  const value = Number(
+    offer?.quantity_in_stock ?? 0
+  );
+
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getDescription(offer: any): string {
+  return String(
+    offer?.description ?? ""
+  ).trim();
+}
+
+function getCategoryId(offer: any): string {
+  return String(
+    offer?.categoryId ?? ""
+  ).trim();
 }
 
 export async function GET() {
   try {
     // ---------------------------------------------------------
-    // 1. Загружаем XLS
+    // 1. Загружаем XML
     // ---------------------------------------------------------
 
-    const xlsResponse = await fetch(XLS_URL, {
+    const response = await fetch(XML_URL, {
       cache: "no-store",
     });
 
-    if (!xlsResponse.ok) {
+    if (!response.ok) {
       throw new Error(
-        `Не удалось скачать XLS: ${xlsResponse.status} ${xlsResponse.statusText}`
+        `Ошибка загрузки XML: ${response.status} ${response.statusText}`
       );
     }
 
-    const xlsBuffer = Buffer.from(
-      await xlsResponse.arrayBuffer()
-    );
-
-    const workbook = XLSX.read(xlsBuffer, {
-      type: "buffer",
-    });
-
-    const sheetName = workbook.SheetNames[0];
-
-    if (!sheetName) {
-      throw new Error("В XLS нет листов");
-    }
-
-    const sheet = workbook.Sheets[sheetName];
-
-    const rows = XLSX.utils.sheet_to_json<any[]>(sheet, {
-      header: 1,
-      defval: null,
-    });
-
-    // Заголовки находятся в строке 4 Excel,
-    // то есть индекс 3.
-    const headerRowIndex = 3;
-
-    const headers = rows[headerRowIndex] || [];
-
-    const article1Index = headers.findIndex(
-      (value: any) =>
-        String(value ?? "").trim() === "Артикул1 *"
-    );
-
-    const article2Index = headers.findIndex(
-      (value: any) =>
-        String(value ?? "").trim() === "Артикул2 *"
-    );
-
-    const sizeIndex = headers.findIndex(
-      (value: any) =>
-        String(value ?? "").trim() === "Розмір *"
-    );
-
-    const colorIndex = headers.findIndex(
-      (value: any) =>
-        String(value ?? "").trim() === "Колір *"
-    );
-
-    const barcodeIndex = headers.findIndex(
-      (value: any) =>
-        String(value ?? "").trim() === "Штрих-код"
-    );
-
-    const codeIndex = headers.findIndex(
-      (value: any) =>
-        String(value ?? "").trim() === "Код"
-    );
-
-    if (article1Index === -1) {
-      throw new Error("В XLS не найден столбец Артикул1 *");
-    }
-
-    if (sizeIndex === -1) {
-      throw new Error("В XLS не найден столбец Розмір *");
-    }
-
-    if (colorIndex === -1) {
-      throw new Error("В XLS не найден столбец Колір *");
-    }
-
-    // Берём первые 10 товарных строк.
-    const xlsRows = rows
-      .slice(headerRowIndex + 1)
-      .filter((row: any[]) => {
-        return row && row.length > 0;
-      })
-      .slice(0, 10);
-
-    const xlsProducts = xlsRows.map((row: any[], index: number) => {
-      const article1 = String(
-        row[article1Index] ?? ""
-      ).trim();
-
-      const article2 =
-        article2Index !== -1
-          ? String(row[article2Index] ?? "").trim()
-          : "";
-
-      const size = String(
-        row[sizeIndex] ?? ""
-      ).trim();
-
-      const color = String(
-        row[colorIndex] ?? ""
-      ).trim();
-
-      const barcode =
-        barcodeIndex !== -1
-          ? String(row[barcodeIndex] ?? "").trim()
-          : "";
-
-      const code =
-        codeIndex !== -1
-          ? String(row[codeIndex] ?? "").trim()
-          : "";
-
-      const baseArticle =
-        getBaseArticle(article1) ||
-        getBaseArticle(article2);
-
-      return {
-        xlsRow: index + headerRowIndex + 2,
-        code,
-        article1,
-        article2,
-        baseArticle,
-        barcode,
-        size,
-        color,
-      };
-    });
+    const xmlText = await response.text();
 
     // ---------------------------------------------------------
-    // 2. Загружаем XML
-    // ---------------------------------------------------------
-
-    const xmlResponse = await fetch(XML_URL, {
-      cache: "no-store",
-    });
-
-    if (!xmlResponse.ok) {
-      throw new Error(
-        `Не удалось скачать XML: ${xmlResponse.status} ${xmlResponse.statusText}`
-      );
-    }
-
-    const xmlText = await xmlResponse.text();
-
-    // ---------------------------------------------------------
-    // 3. Парсим XML
+    // 2. Парсим XML
     // ---------------------------------------------------------
 
     const parser = new XMLParser({
@@ -258,179 +108,381 @@ export async function GET() {
         : [];
 
     // ---------------------------------------------------------
-    // 4. Для каждого XLS варианта ищем XML offer
-    //    по:
-    //      vendorCode
-    //      + color
-    //      + size
+    // 3. Находим один полноценный товар
     // ---------------------------------------------------------
 
-    const results = xlsProducts.map((xlsItem) => {
-      const baseArticle = normalize(
-        xlsItem.baseArticle
+    const productOffers = offers.filter(
+      (offer: any) =>
+        String(
+          offer?.["@_group_id"] ?? ""
+        ).trim() === TEST_GROUP_ID
+    );
+
+    if (!productOffers.length) {
+      throw new Error(
+        `group_id ${TEST_GROUP_ID} не найден`
       );
+    }
 
-      const xlsColor = normalize(
-        xlsItem.color
-      );
+    const firstOffer = productOffers[0];
 
-      const xlsSize = normalize(
-        xlsItem.size
-      );
+    // ---------------------------------------------------------
+    // 4. Собираем общую информацию о товаре
+    // ---------------------------------------------------------
 
-      const candidates = offers.filter((offer: any) => {
-        const vendorCode = normalize(
-          offer?.vendorCode
-        );
+    const product = {
+      groupId: TEST_GROUP_ID,
 
-        return (
-          vendorCode &&
-          baseArticle &&
-          vendorCode === baseArticle
-        );
-      });
+      name:
+        firstOffer?.name ?? null,
 
-      const matchedOffers = candidates.filter(
-        (offer: any) => {
-          const xmlColor = normalize(
-            getParam(offer, ["Колір", "Цвет", "Color"])
-          );
+      vendorCode:
+        firstOffer?.vendorCode ?? null,
 
-          const xmlSize = normalize(
-            getParam(offer, [
-              "Розмір",
-              "Международный размер",
-              "Размеры мужских рубашек",
-              "Размер",
-              "Size",
-            ])
-          );
+      sku:
+        firstOffer?.sku ?? null,
 
-          const colorMatches =
-            !xlsColor ||
-            !xmlColor ||
-            xmlColor === xlsColor;
+      categoryId:
+        getCategoryId(firstOffer),
 
-          const sizeMatches =
-            !xlsSize ||
-            !xmlSize ||
-            xmlSize === xlsSize;
+      categoryName:
+        firstOffer?.categoryName ?? null,
 
-          return colorMatches && sizeMatches;
-        }
-      );
+      categoryParentId:
+        firstOffer?.categoryParentId ?? null,
 
-      return {
-        xls: xlsItem,
+      categoryParentName:
+        firstOffer?.categoryParentName ?? null,
 
-        baseArticle,
+      url:
+        firstOffer?.url ?? null,
 
-        vendorCodeCandidates: candidates.length,
+      description:
+        getDescription(firstOffer),
 
-        matchedVariants: matchedOffers.map(
-          (offer: any) => ({
-            offerId: offer?.["@_id"] ?? null,
-            available:
-              offer?.["@_available"] ?? null,
+      brand:
+        getParam(firstOffer, [
+          "Бренд",
+        ]),
 
-            groupId:
-              offer?.["@_group_id"] ?? null,
+      manufacturer:
+        getParam(firstOffer, [
+          "Виробник",
+          "Производитель",
+        ]),
 
-            sku:
-              offer?.sku ?? null,
+      country:
+        getParam(firstOffer, [
+          "Країна виробник",
+          "Страна производитель",
+        ]),
 
-            vendorCode:
-              offer?.vendorCode ?? null,
+      gender:
+        getParam(firstOffer, [
+          "Стать",
+          "Пол",
+          "Gender",
+        ]),
 
-            name:
-              offer?.name ?? null,
+      material:
+        getParam(firstOffer, [
+          "Матеріал",
+          "Материал",
+        ]),
 
-            price:
-              offer?.price ?? null,
+      composition:
+        getParam(firstOffer, [
+          "Склад",
+          "Состав",
+        ]),
 
-            oldprice:
-              offer?.oldprice ?? null,
+      season:
+        getParam(firstOffer, [
+          "Сезон",
+          "Сезонність",
+          "Сезонность",
+        ]),
 
-            color: getParam(offer, [
-              "Колір",
-              "Цвет",
-              "Color",
-            ]),
+      style:
+        getParam(firstOffer, [
+          "Стиль",
+        ]),
 
-            size: getParam(offer, [
-              "Розмір",
-              "Международный размер",
-              "Размеры мужских рубашек",
-              "Размер",
-              "Size",
-            ]),
+      sleeve:
+        getParam(firstOffer, [
+          "Довжина рукава",
+          "Длина рукава",
+        ]),
 
-            stock: getStock(offer),
+      length:
+        getParam(firstOffer, [
+          "Довжина",
+          "Длина",
+        ]),
 
-            pictures: Array.isArray(
-              offer?.picture
-            )
-              ? offer.picture
-              : offer?.picture
-                ? [offer.picture]
-                : [],
-          })
+      neckline:
+        getParam(firstOffer, [
+          "Виріз",
+          "Вырез",
+        ]),
+
+      closure:
+        getParam(firstOffer, [
+          "Застібка",
+          "Застежка",
+        ]),
+
+      fit:
+        getParam(firstOffer, [
+          "Особливості крою",
+          "Особенности кроя",
+        ]),
+
+      fabricFeatures:
+        getParam(firstOffer, [
+          "Особливості тканини",
+          "Особенности ткани",
+        ]),
+
+      color:
+        getParam(firstOffer, [
+          "Колір",
+          "Цвет",
+        ]),
+
+      sizeGroup:
+        getParam(firstOffer, [
+          "Розмірна група",
+          "Размерная группа",
+        ]),
+
+      pictures: getPictures(firstOffer),
+
+      // Цена AGER и будущая цена KONA LADY
+      agerPrice:
+        Number(firstOffer?.price ?? 0),
+
+      konaLadyPrice:
+        Math.ceil(
+          Number(firstOffer?.price ?? 0) * 1.25
         ),
-      };
-    });
+    };
 
     // ---------------------------------------------------------
-    // 5. Итоговая статистика
+    // 5. Собираем ВСЕ варианты этого group_id
     // ---------------------------------------------------------
 
-    const matched = results.filter(
-      (item) => item.matchedVariants.length > 0
+    const variants = productOffers.map(
+      (offer: any) => ({
+        offerId:
+          offer?.["@_id"] ?? null,
+
+        available:
+          String(
+            offer?.["@_available"] ?? ""
+          ),
+
+        groupId:
+          offer?.["@_group_id"] ?? null,
+
+        sku:
+          offer?.sku ?? null,
+
+        vendorCode:
+          offer?.vendorCode ?? null,
+
+        name:
+          offer?.name ?? null,
+
+        agerPrice:
+          Number(offer?.price ?? 0),
+
+        konaLadyPrice:
+          Math.ceil(
+            Number(offer?.price ?? 0) * 1.25
+          ),
+
+        oldPrice:
+          Number(offer?.oldprice ?? 0),
+
+        color:
+          getParam(offer, [
+            "Колір",
+            "Цвет",
+          ]),
+
+        size:
+          getParam(offer, [
+            "Розмір",
+            "Международный размер",
+            "Размеры мужских рубашек",
+            "Размер",
+          ]),
+
+        stockQuantity:
+          getStock(offer),
+
+        isAvailable:
+          String(
+            offer?.["@_available"] ?? ""
+          ) === "true",
+
+        pictures:
+          getPictures(offer),
+      })
     );
 
-    const uniqueMatches = results.filter(
-      (item) => item.matchedVariants.length === 1
+    // ---------------------------------------------------------
+    // 6. Суммарный остаток
+    // ---------------------------------------------------------
+
+    const totalStock = variants.reduce(
+      (sum: number, variant: any) =>
+        sum + variant.stockQuantity,
+      0
     );
 
-    const multipleMatches = results.filter(
-      (item) => item.matchedVariants.length > 1
-    );
+    // ---------------------------------------------------------
+    // 7. Измерения
+    // ---------------------------------------------------------
 
-    const noMatches = results.filter(
-      (item) => item.matchedVariants.length === 0
-    );
+    const measurements = variants
+      .map((variant: any) => {
+        const offer = productOffers.find(
+          (item: any) =>
+            String(
+              item?.["@_id"] ?? ""
+            ) ===
+            String(
+              variant.offerId ?? ""
+            )
+        );
+
+        if (!offer) {
+          return null;
+        }
+
+        const getMeasurement = (
+          names: string[]
+        ): string | null => {
+          const value = getParam(
+            offer,
+            names
+          );
+
+          return value || null;
+        };
+
+        return {
+          offerId: variant.offerId,
+
+          size: variant.size,
+
+          bust:
+            getMeasurement([
+              "Напівобхват грудей",
+              "Полуобхват груди",
+            ]),
+
+          waist:
+            getMeasurement([
+              "Напівобхват пояса",
+              "Полуобхват пояса",
+            ]),
+
+          hips:
+            getMeasurement([
+              "Напівобхват стегон",
+              "Полуобхват бедер",
+            ]),
+
+          length:
+            getMeasurement([
+              "Довжина виробу",
+              "Длина изделия",
+            ]),
+
+          sleeve:
+            getMeasurement([
+              "Довжина рукава",
+              "Длина рукава",
+            ]),
+
+          shoulder:
+            getMeasurement([
+              "Ширина плечей",
+              "Ширина плеч",
+            ]),
+        };
+      })
+      .filter(Boolean);
+
+    // ---------------------------------------------------------
+    // 8. Возвращаем полный диагностический результат
+    // ---------------------------------------------------------
 
     return Response.json({
       ok: true,
 
-      test: "AGER XLS → XML by article + color + size",
-
-      xls: {
-        fileSizeBytes: xlsBuffer.length,
-        sheetName,
-        rowsCount: rows.length,
-        testedRows: xlsProducts.length,
-      },
+      test:
+        "AGER XML full product card",
 
       xml: {
-        fileSizeBytes: Buffer.byteLength(
-          xmlText,
-          "utf8"
-        ),
-        offersCount: offers.length,
+        fileSizeBytes:
+          Buffer.byteLength(
+            xmlText,
+            "utf8"
+          ),
+
+        offersCount:
+          offers.length,
       },
 
-      statistics: {
-        tested: results.length,
-        matched: matched.length,
-        uniqueMatches: uniqueMatches.length,
-        multipleMatches: multipleMatches.length,
-        noMatches: noMatches.length,
-      },
+      product,
 
-      results,
+      variants,
+
+      totalStock,
+
+      measurements,
+
+      checks: {
+        variantsCount:
+          variants.length,
+
+        picturesCount:
+          product.pictures.length,
+
+        hasDescription:
+          Boolean(product.description),
+
+        hasBrand:
+          Boolean(product.brand),
+
+        hasMaterial:
+          Boolean(product.material),
+
+        hasComposition:
+          Boolean(product.composition),
+
+        hasSeason:
+          Boolean(product.season),
+
+        hasGender:
+          Boolean(product.gender),
+
+        hasCategoryId:
+          Boolean(product.categoryId),
+
+        konaLadyPriceFormula:
+          "ceil(AGER price × 1.25)",
+      },
     });
   } catch (error: any) {
-    console.error("AGER IMPORT TEST ERROR:", error);
+    console.error(
+      "AGER FULL PRODUCT TEST ERROR:",
+      error
+    );
 
     return Response.json(
       {
