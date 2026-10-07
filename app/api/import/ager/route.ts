@@ -1,93 +1,30 @@
 import { XMLParser } from "fast-xml-parser";
 import * as XLSX from "xlsx";
 
-const AGER_XML_URL = "http://ager.ua/download/catalog_ua.xml";
-const AGER_XLS_URL =
+const XLS_URL =
   "http://ager.ua/download/ager_actual_price_and_stock.xls";
 
-type XmlOffer = {
-  "@_id"?: string;
-  "@_available"?: string;
-  name?: string;
-  vendorCode?: string;
-  price?: string | number;
-  oldprice?: string | number;
-  sku?: string | number;
-  group_id?: string | number;
-  barcode?: string | number;
-  param?: unknown;
-};
-
-function asArray<T>(value: T | T[] | undefined | null): T[] {
-  if (value == null) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-function textValue(value: unknown): string {
-  if (value == null) return "";
-
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value).trim();
-  }
-
-  if (typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    return String(obj["#text"] ?? "").trim();
-  }
-
-  return "";
-}
-
-function normalize(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function getParamValue(
-  params: unknown,
-  wantedNames: string[]
-): string | null {
-  const wanted = new Set(wantedNames.map(normalize));
-
-  for (const param of asArray(params as any)) {
-    if (!param || typeof param !== "object") continue;
-
-    const item = param as Record<string, unknown>;
-
-    const name = normalize(item["@_name"]);
-
-    if (wanted.has(name)) {
-      return textValue(item["#text"] ?? item);
-    }
-  }
-
-  return null;
-}
+const XML_URL =
+  "http://ager.ua/download/catalog_ua.xml";
 
 export async function GET() {
   try {
-    // ============================================================
+    // =========================
     // 1. Загружаем XLS
-    // ============================================================
-
-    const xlsResponse = await fetch(AGER_XLS_URL, {
+    // =========================
+    const xlsResponse = await fetch(XLS_URL, {
       cache: "no-store",
     });
 
     if (!xlsResponse.ok) {
-      return Response.json(
-        {
-          ok: false,
-          step: "xls",
-          error: `AGER XLS вернул HTTP ${xlsResponse.status}`,
-        },
-        { status: 500 }
+      throw new Error(
+        `Не удалось загрузить XLS: ${xlsResponse.status}`
       );
     }
 
-    const xlsBuffer = Buffer.from(await xlsResponse.arrayBuffer());
+    const xlsBuffer = Buffer.from(
+      await xlsResponse.arrayBuffer()
+    );
 
     const workbook = XLSX.read(xlsBuffer, {
       type: "buffer",
@@ -97,265 +34,209 @@ export async function GET() {
     const sheetName = workbook.SheetNames[0];
 
     if (!sheetName) {
-      return Response.json(
-        {
-          ok: false,
-          step: "xls",
-          error: "В XLS нет листов",
-        },
-        { status: 500 }
-      );
+      throw new Error("В XLS нет листов");
     }
 
-    const worksheet = workbook.Sheets[sheetName];
+    const sheet = workbook.Sheets[sheetName];
 
-    const rows = XLSX.utils.sheet_to_json(worksheet, {
+    const rows = XLSX.utils.sheet_to_json<any[]>(sheet, {
       header: 1,
       defval: null,
-      raw: false,
-    }) as unknown[][];
-
-    // Заголовки находятся в строке 4 (индекс 3).
-    const headers = rows[3] ?? [];
-
-    const headerMap = new Map<string, number>();
-
-    headers.forEach((header, index) => {
-      if (header != null && String(header).trim() !== "") {
-        headerMap.set(String(header).trim(), index);
-      }
     });
 
-    function xlsValue(row: unknown[], header: string): string {
-      const index = headerMap.get(header);
+    // В AGER заголовки находятся в строке Excel №4
+    // => индекс 3
+    const headerRowIndex = 3;
 
-      if (index === undefined) {
-        return "";
-      }
+    const headers = rows[headerRowIndex] || [];
 
-      return String(row[index] ?? "").trim();
+    const codeIndex = headers.findIndex(
+      (value: any) => String(value ?? "").trim() === "Код"
+    );
+
+    if (codeIndex === -1) {
+      throw new Error('Колонка "Код" не найдена в XLS');
     }
 
-    // Берём первые 10 реальных строк товаров.
-    const xlsRows = rows
-      .slice(4)
-      .filter((row) => {
-        return Boolean(
-          xlsValue(row, "Код") ||
-            xlsValue(row, "Артикул1 *") ||
-            xlsValue(row, "Штрих-код")
-        );
-      })
-      .slice(0, 10);
+    // Берём первые 10 уникальных кодов
+    const codes: string[] = [];
 
-    // ============================================================
-    // 2. Получаем штрих-коды из XLS
-    // ============================================================
+    for (
+      let rowIndex = headerRowIndex + 1;
+      rowIndex < rows.length;
+      rowIndex++
+    ) {
+      const row = rows[rowIndex];
 
-    const xlsBarcodes = xlsRows
-      .map((row) => xlsValue(row, "Штрих-код"))
-      .filter(Boolean);
+      if (!row) continue;
 
-    // ============================================================
-    // 3. Загружаем XML
-    // ============================================================
+      const code = String(row[codeIndex] ?? "").trim();
 
-    const xmlResponse = await fetch(AGER_XML_URL, {
+      if (!code) continue;
+
+      if (!codes.includes(code)) {
+        codes.push(code);
+      }
+
+      if (codes.length >= 10) break;
+    }
+
+    // =========================
+    // 2. Загружаем XML как RAW TEXT
+    // =========================
+    const xmlResponse = await fetch(XML_URL, {
       cache: "no-store",
     });
 
     if (!xmlResponse.ok) {
-      return Response.json(
-        {
-          ok: false,
-          step: "xml",
-          error: `AGER XML вернул HTTP ${xmlResponse.status}`,
-        },
-        { status: 500 }
+      throw new Error(
+        `Не удалось загрузить XML: ${xmlResponse.status}`
       );
     }
 
     const xmlText = await xmlResponse.text();
 
-    // ============================================================
-    // 4. Сначала ищем штрих-коды непосредственно в сыром XML
-    // ============================================================
+    // =========================
+    // 3. Ищем каждый Код
+    // =========================
+    const results = codes.map((code) => {
+      const index = xmlText.indexOf(code);
 
-    const rawBarcodeSearch = xlsBarcodes.map((barcode) => {
-      const normalizedBarcode = normalize(barcode);
+      if (index === -1) {
+        return {
+          code,
+          foundInRawXml: false,
+          rawXmlIndex: -1,
+          rawXmlPreview: null,
+        };
+      }
 
-      const index = xmlText.indexOf(normalizedBarcode);
+      const previewStart = Math.max(0, index - 1500);
+      const previewEnd = Math.min(
+        xmlText.length,
+        index + code.length + 1500
+      );
 
       return {
-        barcode,
-        foundInRawXml: index !== -1,
+        code,
+        foundInRawXml: true,
         rawXmlIndex: index,
-        rawXmlPreview:
-          index !== -1
-            ? xmlText.slice(
-                Math.max(0, index - 500),
-                Math.min(xmlText.length, index + 1000)
-              )
-            : null,
+        rawXmlPreview: xmlText.slice(
+          previewStart,
+          previewEnd
+        ),
       };
     });
 
-    // ============================================================
-    // 5. Парсим XML
-    // ============================================================
-
+    // =========================
+    // 4. Для найденных кодов
+    //    дополнительно пытаемся
+    //    показать XML offer
+    // =========================
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: "@_",
       textNodeName: "#text",
-      parseTagValue: false,
       trimValues: true,
+      parseTagValue: false,
     });
 
     const parsed = parser.parse(xmlText);
 
-    const offers = asArray(
-      parsed?.yml_catalog?.shop?.offers?.offer
-    ) as XmlOffer[];
+    const offersRaw =
+      parsed?.yml_catalog?.shop?.offers?.offer;
 
-    // ============================================================
-    // 6. Ищем штрих-коды уже внутри XML offers
-    // ============================================================
+    const offers = Array.isArray(offersRaw)
+      ? offersRaw
+      : offersRaw
+        ? [offersRaw]
+        : [];
 
-    const offerResults = xlsRows.map((row) => {
-      const barcode = xlsValue(row, "Штрих-код");
-      const code = xlsValue(row, "Код");
-      const article1 = xlsValue(row, "Артикул1 *");
-      const article2 = xlsValue(row, "Артикул2 *");
-      const size = xlsValue(row, "Розмір *");
-      const colorUa = xlsValue(row, "Колір *");
-      const colorRu = xlsValue(row, "Цвет *");
-
-      const normalizedBarcode = normalize(barcode);
+    const offerMatches = results.map((result) => {
+      if (!result.foundInRawXml) {
+        return {
+          code: result.code,
+          matchesCount: 0,
+          matches: [],
+        };
+      }
 
       const matches = offers
-        .map((offer) => {
-          const directBarcode = normalize(offer.barcode);
+        .filter((offer: any) => {
+          const offerText = JSON.stringify(offer);
 
-          const paramBarcode = normalize(
-            getParamValue(offer.param, [
-              "Штрих-код",
-              "Штрихкод",
-              "Barcode",
-              "Баркод",
-            ])
-          );
-
-          const xmlBarcode = directBarcode || paramBarcode;
-
-          if (
-            !normalizedBarcode ||
-            !xmlBarcode ||
-            normalizedBarcode !== xmlBarcode
-          ) {
-            return null;
-          }
-
-          return {
-            offerId: offer["@_id"] ?? null,
-            available: offer["@_available"] ?? null,
-
-            groupId: textValue(offer.group_id) || null,
-            sku: textValue(offer.sku) || null,
-            vendorCode: textValue(offer.vendorCode) || null,
-
-            name: textValue(offer.name) || null,
-
-            price: textValue(offer.price) || null,
-            oldprice: textValue(offer.oldprice) || null,
-
-            barcode: xmlBarcode,
-
-            size:
-              getParamValue(offer.param, [
-                "Размер",
-                "Международный размер",
-                "Размеры мужских рубашек",
-                "Розмір",
-              ]) || null,
-
-            color:
-              getParamValue(offer.param, [
-                "Цвет",
-                "Колір",
-                "Цвет товара",
-              ]) || null,
-          };
+          return offerText.includes(result.code);
         })
-        .filter(Boolean);
+        .slice(0, 10)
+        .map((offer: any) => ({
+          offerId: offer?.["@_id"] ?? null,
+          groupId: offer?.group_id ?? null,
+          sku: offer?.sku ?? null,
+          vendorCode: offer?.vendorCode ?? null,
+          name:
+            typeof offer?.name === "string"
+              ? offer.name
+              : null,
+          price: offer?.price ?? null,
+          oldprice: offer?.oldprice ?? null,
+          offer,
+        }));
 
       return {
-        xls: {
-          code,
-          article1,
-          article2,
-          barcode,
-          size,
-          colorUa,
-          colorRu,
-        },
-
-        xml: {
-          matchesCount: matches.length,
-          matches,
-        },
+        code: result.code,
+        matchesCount: matches.length,
+        matches,
       };
     });
 
-    const matchedRows = offerResults.filter(
-      (item) => item.xml.matchesCount > 0
-    ).length;
-
     return Response.json({
       ok: true,
-
-      test: "AGER XLS → XML search by barcode",
-
+      test: "AGER XLS → XML search by Код",
       xls: {
-        fileSizeBytes: xlsBuffer.byteLength,
+        fileSizeBytes: xlsBuffer.length,
         sheetName,
         rowsCount: rows.length,
-        testedRows: xlsRows.length,
-        barcodes: xlsBarcodes,
+        headers,
+        codeColumnIndex: codeIndex,
+        testedCodes: codes,
       },
-
       xml: {
         fileSizeBytes: Buffer.byteLength(xmlText, "utf8"),
         offersCount: offers.length,
       },
-
       rawXmlSearch: {
-        tested: rawBarcodeSearch.length,
-        found: rawBarcodeSearch.filter(
+        tested: results.length,
+        found: results.filter(
           (item) => item.foundInRawXml
         ).length,
-        results: rawBarcodeSearch,
+        results,
       },
-
       offerSearch: {
-        tested: offerResults.length,
-        matchedRows,
-        notMatchedRows: offerResults.length - matchedRows,
-        results: offerResults,
+        tested: offerMatches.length,
+        matchedRows: offerMatches.filter(
+          (item) => item.matchesCount > 0
+        ).length,
+        notMatchedRows: offerMatches.filter(
+          (item) => item.matchesCount === 0
+        ).length,
+        results: offerMatches,
       },
     });
-  } catch (error) {
-    console.error("AGER XLS/XML barcode test error:", error);
-
+  } catch (error: any) {
     return Response.json(
       {
         ok: false,
         error:
-          error instanceof Error
-            ? error.message
-            : "Неизвестная ошибка",
+          error?.message ||
+          String(error),
+        stack:
+          process.env.NODE_ENV === "development"
+            ? error?.stack
+            : undefined,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
