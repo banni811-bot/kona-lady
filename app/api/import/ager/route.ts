@@ -34,31 +34,30 @@ export async function GET() {
 
     const offers = data?.yml_catalog?.shop?.offers?.offer ?? [];
 
-    const groupOffers = offers
-      .filter((offer: any) => String(offer["@_group_id"]) === "3537")
-      .map((offer: any) => ({
-        id: offer["@_id"] ?? null,
-        available: offer["@_available"] ?? null,
-        group_id: offer["@_group_id"] ?? null,
-        sku: offer.sku ?? null,
-        name: offer.name ?? null,
-        vendorCode: offer.vendorCode ?? null,
-        price: offer.price ?? null,
-        oldprice: offer.oldprice ?? null,
-        categoryId: offer.categoryId ?? null,
-        quantity_in_stock: offer.quantity_in_stock ?? null,
-        pictures: offer.picture ?? [],
-        params: offer.param ?? [],
-      }));
+    const offer = offers.find(
+      (item: any) => String(item["@_group_id"]) === "3537"
+    );
+
+    if (!offer) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Товар group_id=3537 не найден",
+        },
+        { status: 404 }
+      );
+    }
 
     return Response.json({
       ok: true,
-      groupId: "3537",
-      variantsCount: groupOffers.length,
-      variants: groupOffers,
+      groupId: offer["@_group_id"] ?? null,
+      offerId: offer["@_id"] ?? null,
+      vendorCode: offer.vendorCode ?? null,
+      name: offer.name ?? null,
+      description: offer.description ?? null,
     });
   } catch (error) {
-    console.error("AGER group test error:", error);
+    console.error("AGER measurements test error:", error);
 
     return Response.json(
       {
