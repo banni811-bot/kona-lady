@@ -14,8 +14,8 @@ type XmlOffer = {
   oldprice?: string | number;
   sku?: string | number;
   group_id?: string | number;
-  param?: unknown;
   barcode?: string | number;
+  param?: unknown;
 };
 
 function asArray<T>(value: T | T[] | undefined | null): T[] {
@@ -115,7 +115,7 @@ export async function GET() {
       raw: false,
     }) as unknown[][];
 
-    // В XLS заголовки находятся в строке 4.
+    // Заголовки находятся в строке 4 (индекс 3).
     const headers = rows[3] ?? [];
 
     const headerMap = new Map<string, number>();
@@ -136,6 +136,7 @@ export async function GET() {
       return String(row[index] ?? "").trim();
     }
 
+    // Берём первые 10 реальных строк товаров.
     const xlsRows = rows
       .slice(4)
       .filter((row) => {
@@ -148,7 +149,15 @@ export async function GET() {
       .slice(0, 10);
 
     // ============================================================
-    // 2. Загружаем XML
+    // 2. Получаем штрих-коды из XLS
+    // ============================================================
+
+    const xlsBarcodes = xlsRows
+      .map((row) => xlsValue(row, "Штрих-код"))
+      .filter(Boolean);
+
+    // ============================================================
+    // 3. Загружаем XML
     // ============================================================
 
     const xmlResponse = await fetch(AGER_XML_URL, {
@@ -168,6 +177,33 @@ export async function GET() {
 
     const xmlText = await xmlResponse.text();
 
+    // ============================================================
+    // 4. Сначала ищем штрих-коды непосредственно в сыром XML
+    // ============================================================
+
+    const rawBarcodeSearch = xlsBarcodes.map((barcode) => {
+      const normalizedBarcode = normalize(barcode);
+
+      const index = xmlText.indexOf(normalizedBarcode);
+
+      return {
+        barcode,
+        foundInRawXml: index !== -1,
+        rawXmlIndex: index,
+        rawXmlPreview:
+          index !== -1
+            ? xmlText.slice(
+                Math.max(0, index - 500),
+                Math.min(xmlText.length, index + 1000)
+              )
+            : null,
+      };
+    });
+
+    // ============================================================
+    // 5. Парсим XML
+    // ============================================================
+
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: "@_",
@@ -183,105 +219,75 @@ export async function GET() {
     ) as XmlOffer[];
 
     // ============================================================
-    // 3. Для каждой XLS строки ищем XML по названию
+    // 6. Ищем штрих-коды уже внутри XML offers
     // ============================================================
 
-    const results = xlsRows.map((row) => {
+    const offerResults = xlsRows.map((row) => {
+      const barcode = xlsValue(row, "Штрих-код");
       const code = xlsValue(row, "Код");
       const article1 = xlsValue(row, "Артикул1 *");
       const article2 = xlsValue(row, "Артикул2 *");
-      const barcode = xlsValue(row, "Штрих-код");
-      const nameUa = xlsValue(row, "Назва*");
-      const nameRu = xlsValue(row, "Назва* (рос.)");
       const size = xlsValue(row, "Розмір *");
       const colorUa = xlsValue(row, "Колір *");
       const colorRu = xlsValue(row, "Цвет *");
-      const quantity = xlsValue(row, "Кількість *");
-      const dropshipPrice = xlsValue(row, "Ціна дропшиппінг");
 
-      const normalizedUa = normalize(nameUa);
-      const normalizedRu = normalize(nameRu);
+      const normalizedBarcode = normalize(barcode);
 
-      // Ищем все XML offers, где название совпадает
-      // с украинским или русским названием из XLS.
-      const nameMatches = offers.filter((offer) => {
-        const xmlName = normalize(textValue(offer.name));
+      const matches = offers
+        .map((offer) => {
+          const directBarcode = normalize(offer.barcode);
 
-        return (
-          (normalizedUa && xmlName === normalizedUa) ||
-          (normalizedRu && xmlName === normalizedRu)
-        );
-      });
-
-      const detailedMatches = nameMatches.map((offer) => {
-        const params = offer.param;
-
-        return {
-          offerId: offer["@_id"] ?? null,
-          available: offer["@_available"] ?? null,
-
-          groupId: textValue(offer.group_id) || null,
-          sku: textValue(offer.sku) || null,
-          vendorCode: textValue(offer.vendorCode) || null,
-
-          name: textValue(offer.name) || null,
-
-          price: textValue(offer.price) || null,
-          oldprice: textValue(offer.oldprice) || null,
-
-          barcode:
-            textValue(offer.barcode) ||
-            getParamValue(params, [
+          const paramBarcode = normalize(
+            getParamValue(offer.param, [
               "Штрих-код",
               "Штрихкод",
               "Barcode",
               "Баркод",
-            ]) ||
-            null,
+            ])
+          );
 
-          size:
-            getParamValue(params, [
-              "Размер",
-              "Международный размер",
-              "Размеры мужских рубашек",
-              "Розмір",
-            ]) || null,
+          const xmlBarcode = directBarcode || paramBarcode;
 
-          color:
-            getParamValue(params, [
-              "Цвет",
-              "Колір",
-              "Цвет товара",
-            ]) || null,
+          if (
+            !normalizedBarcode ||
+            !xmlBarcode ||
+            normalizedBarcode !== xmlBarcode
+          ) {
+            return null;
+          }
 
-          paramsCount: asArray(params as any).length,
-        };
-      });
+          return {
+            offerId: offer["@_id"] ?? null,
+            available: offer["@_available"] ?? null,
 
-      // Дополнительно ищем среди совпадений по названию
-      // вариант с тем же размером и цветом.
-      const exactVariantMatches = detailedMatches.filter((match) => {
-        const xmlSize = normalize(match.size);
-        const xmlColor = normalize(match.color);
+            groupId: textValue(offer.group_id) || null,
+            sku: textValue(offer.sku) || null,
+            vendorCode: textValue(offer.vendorCode) || null,
 
-        const wantedSize = normalize(size);
-        const wantedColors = [
-          normalize(colorUa),
-          normalize(colorRu),
-        ].filter(Boolean);
+            name: textValue(offer.name) || null,
 
-        const sizeOk =
-          !wantedSize ||
-          !xmlSize ||
-          xmlSize === wantedSize;
+            price: textValue(offer.price) || null,
+            oldprice: textValue(offer.oldprice) || null,
 
-        const colorOk =
-          wantedColors.length === 0 ||
-          !xmlColor ||
-          wantedColors.includes(xmlColor);
+            barcode: xmlBarcode,
 
-        return sizeOk && colorOk;
-      });
+            size:
+              getParamValue(offer.param, [
+                "Размер",
+                "Международный размер",
+                "Размеры мужских рубашек",
+                "Розмір",
+              ]) || null,
+
+            color:
+              getParamValue(offer.param, [
+                "Цвет",
+                "Колір",
+                "Цвет товара",
+              ]) || null,
+          };
+        })
+        .filter(Boolean);
 
       return {
         xls: {
@@ -289,46 +295,33 @@ export async function GET() {
           article1,
           article2,
           barcode,
-          nameUa,
-          nameRu,
           size,
           colorUa,
           colorRu,
-          quantity,
-          dropshipPrice,
         },
 
         xml: {
-          nameMatchesCount: detailedMatches.length,
-          exactVariantMatchesCount: exactVariantMatches.length,
-
-          nameMatches: detailedMatches.slice(0, 10),
-
-          exactVariantMatches: exactVariantMatches.slice(0, 10),
+          matchesCount: matches.length,
+          matches,
         },
       };
     });
 
-    const totalNameMatches = results.reduce(
-      (sum, item) => sum + item.xml.nameMatchesCount,
-      0
-    );
-
-    const totalExactVariantMatches = results.reduce(
-      (sum, item) => sum + item.xml.exactVariantMatchesCount,
-      0
-    );
+    const matchedRows = offerResults.filter(
+      (item) => item.xml.matchesCount > 0
+    ).length;
 
     return Response.json({
       ok: true,
 
-      test: "AGER XLS → XML search by product name",
+      test: "AGER XLS → XML search by barcode",
 
       xls: {
         fileSizeBytes: xlsBuffer.byteLength,
         sheetName,
         rowsCount: rows.length,
         testedRows: xlsRows.length,
+        barcodes: xlsBarcodes,
       },
 
       xml: {
@@ -336,16 +329,23 @@ export async function GET() {
         offersCount: offers.length,
       },
 
-      matching: {
-        testedRows: results.length,
-        totalNameMatches,
-        totalExactVariantMatches,
+      rawXmlSearch: {
+        tested: rawBarcodeSearch.length,
+        found: rawBarcodeSearch.filter(
+          (item) => item.foundInRawXml
+        ).length,
+        results: rawBarcodeSearch,
       },
 
-      results,
+      offerSearch: {
+        tested: offerResults.length,
+        matchedRows,
+        notMatchedRows: offerResults.length - matchedRows,
+        results: offerResults,
+      },
     });
   } catch (error) {
-    console.error("AGER XLS/XML name matching test error:", error);
+    console.error("AGER XLS/XML barcode test error:", error);
 
     return Response.json(
       {
