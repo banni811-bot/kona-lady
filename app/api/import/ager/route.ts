@@ -15,40 +15,15 @@ type XmlOffer = {
   sku?: string | number;
   group_id?: string | number;
   param?: unknown;
+  barcode?: string | number;
 };
-
-function normalize(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
-}
 
 function asArray<T>(value: T | T[] | undefined | null): T[] {
   if (value == null) return [];
   return Array.isArray(value) ? value : [value];
 }
 
-function getParamValue(
-  params: unknown,
-  wantedNames: string[]
-): string | null {
-  const wanted = new Set(wantedNames.map(normalize));
-
-  for (const param of asArray(params as any)) {
-    if (!param || typeof param !== "object") continue;
-
-    const item = param as Record<string, unknown>;
-    const name = normalize(item["@_name"]);
-
-    if (wanted.has(name)) {
-      return String(item["#text"] ?? item ?? "").trim();
-    }
-  }
-
-  return null;
-}
-
-function getText(value: unknown): string {
+function textValue(value: unknown): string {
   if (value == null) return "";
 
   if (typeof value === "string" || typeof value === "number") {
@@ -63,11 +38,39 @@ function getText(value: unknown): string {
   return "";
 }
 
+function normalize(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getParamValue(
+  params: unknown,
+  wantedNames: string[]
+): string | null {
+  const wanted = new Set(wantedNames.map(normalize));
+
+  for (const param of asArray(params as any)) {
+    if (!param || typeof param !== "object") continue;
+
+    const item = param as Record<string, unknown>;
+
+    const name = normalize(item["@_name"]);
+
+    if (wanted.has(name)) {
+      return textValue(item["#text"] ?? item);
+    }
+  }
+
+  return null;
+}
+
 export async function GET() {
   try {
-    // ------------------------------------------------------------
+    // ============================================================
     // 1. Загружаем XLS
-    // ------------------------------------------------------------
+    // ============================================================
 
     const xlsResponse = await fetch(AGER_XLS_URL, {
       cache: "no-store",
@@ -112,7 +115,7 @@ export async function GET() {
       raw: false,
     }) as unknown[][];
 
-    // Строка 4 в Excel = индекс 3
+    // В XLS заголовки находятся в строке 4.
     const headers = rows[3] ?? [];
 
     const headerMap = new Map<string, number>();
@@ -133,20 +136,20 @@ export async function GET() {
       return String(row[index] ?? "").trim();
     }
 
-    // Берём первые 10 реальных товарных строк.
     const xlsRows = rows
       .slice(4)
       .filter((row) => {
-        const code = xlsValue(row, "Код");
-        const article = xlsValue(row, "Артикул1 *");
-
-        return Boolean(code || article);
+        return Boolean(
+          xlsValue(row, "Код") ||
+            xlsValue(row, "Артикул1 *") ||
+            xlsValue(row, "Штрих-код")
+        );
       })
       .slice(0, 10);
 
-    // ------------------------------------------------------------
+    // ============================================================
     // 2. Загружаем XML
-    // ------------------------------------------------------------
+    // ============================================================
 
     const xmlResponse = await fetch(AGER_XML_URL, {
       cache: "no-store",
@@ -179,106 +182,106 @@ export async function GET() {
       parsed?.yml_catalog?.shop?.offers?.offer
     ) as XmlOffer[];
 
-    // ------------------------------------------------------------
-    // 3. Для каждого XLS варианта ищем XML offer
-    // ------------------------------------------------------------
+    // ============================================================
+    // 3. Для каждой XLS строки ищем XML по названию
+    // ============================================================
 
     const results = xlsRows.map((row) => {
       const code = xlsValue(row, "Код");
       const article1 = xlsValue(row, "Артикул1 *");
       const article2 = xlsValue(row, "Артикул2 *");
       const barcode = xlsValue(row, "Штрих-код");
+      const nameUa = xlsValue(row, "Назва*");
+      const nameRu = xlsValue(row, "Назва* (рос.)");
       const size = xlsValue(row, "Розмір *");
-      const color = xlsValue(row, "Колір *");
+      const colorUa = xlsValue(row, "Колір *");
+      const colorRu = xlsValue(row, "Цвет *");
+      const quantity = xlsValue(row, "Кількість *");
+      const dropshipPrice = xlsValue(row, "Ціна дропшиппінг");
 
-      // Возможные способы поиска.
-      const normalizedCode = normalize(code);
-      const normalizedArticle1 = normalize(article1);
-      const normalizedArticle2 = normalize(article2);
-      const normalizedBarcode = normalize(barcode);
+      const normalizedUa = normalize(nameUa);
+      const normalizedRu = normalize(nameRu);
 
-      let matchedOffer: XmlOffer | null = null;
-      let matchedBy: string | null = null;
+      // Ищем все XML offers, где название совпадает
+      // с украинским или русским названием из XLS.
+      const nameMatches = offers.filter((offer) => {
+        const xmlName = normalize(textValue(offer.name));
 
-      for (const offer of offers) {
-        const offerId = normalize(offer["@_id"]);
-        const vendorCode = normalize(offer.vendorCode);
-        const sku = normalize(offer.sku);
-
-        const offerParams = asArray(offer.param as any);
-
-        const xmlBarcode = normalize(
-          getParamValue(offerParams, [
-            "Штрих-код",
-            "Штрихкод",
-            "Barcode",
-            "Баркод",
-          ])
+        return (
+          (normalizedUa && xmlName === normalizedUa) ||
+          (normalizedRu && xmlName === normalizedRu)
         );
+      });
 
-        const xmlSize = normalize(
-          getParamValue(offerParams, [
-            "Размер",
-            "Международный размер",
-            "Размеры мужских рубашек",
-            "Розмір",
-          ])
-        );
+      const detailedMatches = nameMatches.map((offer) => {
+        const params = offer.param;
 
-        const xmlColor = normalize(
-          getParamValue(offerParams, [
-            "Цвет",
-            "Колір",
-            "Цвет товара",
-          ])
-        );
+        return {
+          offerId: offer["@_id"] ?? null,
+          available: offer["@_available"] ?? null,
 
-        if (normalizedBarcode && normalizedBarcode === xmlBarcode) {
-          matchedOffer = offer;
-          matchedBy = "barcode";
-          break;
-        }
+          groupId: textValue(offer.group_id) || null,
+          sku: textValue(offer.sku) || null,
+          vendorCode: textValue(offer.vendorCode) || null,
 
-        if (
-          normalizedArticle1 &&
-          normalizedArticle1 === vendorCode
-        ) {
-          matchedOffer = offer;
-          matchedBy = "article1 = vendorCode";
-          break;
-        }
+          name: textValue(offer.name) || null,
 
-        if (
-          normalizedArticle2 &&
-          normalizedArticle2 === vendorCode
-        ) {
-          matchedOffer = offer;
-          matchedBy = "article2 = vendorCode";
-          break;
-        }
+          price: textValue(offer.price) || null,
+          oldprice: textValue(offer.oldprice) || null,
 
-        if (
-          normalizedCode &&
-          normalizedCode === sku &&
-          normalize(size) === xmlSize &&
-          normalize(color) === xmlColor
-        ) {
-          matchedOffer = offer;
-          matchedBy = "code = sku + size + color";
-          break;
-        }
+          barcode:
+            textValue(offer.barcode) ||
+            getParamValue(params, [
+              "Штрих-код",
+              "Штрихкод",
+              "Barcode",
+              "Баркод",
+            ]) ||
+            null,
 
-        if (
-          normalizedCode &&
-          normalizedCode === offerId &&
-          normalize(size) === xmlSize &&
-          normalize(color) === xmlColor
-        ) {
-          matchedOffer = offer;
-          matchedBy = "code = offer_id + size + color";
-          break;
-        }
-      }
+          size:
+            getParamValue(params, [
+              "Размер",
+              "Международный размер",
+              "Размеры мужских рубашек",
+              "Розмір",
+            ]) || null,
+
+          color:
+            getParamValue(params, [
+              "Цвет",
+              "Колір",
+              "Цвет товара",
+            ]) || null,
+
+          paramsCount: asArray(params as any).length,
+        };
+      });
+
+      // Дополнительно ищем среди совпадений по названию
+      // вариант с тем же размером и цветом.
+      const exactVariantMatches = detailedMatches.filter((match) => {
+        const xmlSize = normalize(match.size);
+        const xmlColor = normalize(match.color);
+
+        const wantedSize = normalize(size);
+        const wantedColors = [
+          normalize(colorUa),
+          normalize(colorRu),
+        ].filter(Boolean);
+
+        const sizeOk =
+          !wantedSize ||
+          !xmlSize ||
+          xmlSize === wantedSize;
+
+        const colorOk =
+          wantedColors.length === 0 ||
+          !xmlColor ||
+          wantedColors.includes(xmlColor);
+
+        return sizeOk && colorOk;
+      });
 
       return {
         xls: {
@@ -286,73 +289,45 @@ export async function GET() {
           article1,
           article2,
           barcode,
-          name: xlsValue(row, "Назва*"),
-          nameRu: xlsValue(row, "Назва* (рос.)"),
+          nameUa,
+          nameRu,
           size,
-          color,
-          quantity: xlsValue(row, "Кількість *"),
-          dropshipPrice: xlsValue(row, "Ціна дропшиппінг"),
+          colorUa,
+          colorRu,
+          quantity,
+          dropshipPrice,
         },
 
-        xmlMatch: matchedOffer
-          ? {
-              matched: true,
-              matchedBy,
-              offerId: matchedOffer["@_id"] ?? null,
-              available: matchedOffer["@_available"] ?? null,
-              groupId: getText(matchedOffer.group_id),
-              sku: getText(matchedOffer.sku),
-              vendorCode: getText(matchedOffer.vendorCode),
-              name: getText(matchedOffer.name),
-              price: getText(matchedOffer.price),
-              size: getParamValue(
-                matchedOffer.param,
-                [
-                  "Размер",
-                  "Международный размер",
-                  "Размеры мужских рубашек",
-                  "Розмір",
-                ]
-              ),
-              color: getParamValue(
-                matchedOffer.param,
-                [
-                  "Цвет",
-                  "Колір",
-                  "Цвет товара",
-                ]
-              ),
-            }
-          : {
-              matched: false,
-              matchedBy: null,
-              offerId: null,
-              available: null,
-              groupId: null,
-              sku: null,
-              vendorCode: null,
-              name: null,
-              price: null,
-              size: null,
-              color: null,
-            },
+        xml: {
+          nameMatchesCount: detailedMatches.length,
+          exactVariantMatchesCount: exactVariantMatches.length,
+
+          nameMatches: detailedMatches.slice(0, 10),
+
+          exactVariantMatches: exactVariantMatches.slice(0, 10),
+        },
       };
     });
 
-    const matchedCount = results.filter(
-      (item) => item.xmlMatch.matched
-    ).length;
+    const totalNameMatches = results.reduce(
+      (sum, item) => sum + item.xml.nameMatchesCount,
+      0
+    );
+
+    const totalExactVariantMatches = results.reduce(
+      (sum, item) => sum + item.xml.exactVariantMatchesCount,
+      0
+    );
 
     return Response.json({
       ok: true,
 
-      test: "AGER XLS ↔ XML matching",
+      test: "AGER XLS → XML search by product name",
 
       xls: {
         fileSizeBytes: xlsBuffer.byteLength,
         sheetName,
         rowsCount: rows.length,
-        headers,
         testedRows: xlsRows.length,
       },
 
@@ -362,15 +337,15 @@ export async function GET() {
       },
 
       matching: {
-        tested: results.length,
-        matched: matchedCount,
-        notMatched: results.length - matchedCount,
+        testedRows: results.length,
+        totalNameMatches,
+        totalExactVariantMatches,
       },
 
       results,
     });
   } catch (error) {
-    console.error("AGER XLS/XML matching test error:", error);
+    console.error("AGER XLS/XML name matching test error:", error);
 
     return Response.json(
       {
