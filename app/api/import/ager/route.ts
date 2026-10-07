@@ -1,10 +1,11 @@
-import { XMLParser } from "fast-xml-parser";
+import * as XLSX from "xlsx";
 
-const AGER_XML_URL = "http://ager.ua/download/catalog_ua.xml";
+const AGER_XLS_URL =
+  "http://ager.ua/download/ager_actual_price_and_stock.xls";
 
 export async function GET() {
   try {
-    const response = await fetch(AGER_XML_URL, {
+    const response = await fetch(AGER_XLS_URL, {
       cache: "no-store",
     });
 
@@ -12,77 +13,64 @@ export async function GET() {
       return Response.json(
         {
           ok: false,
-          error: `AGER XML вернул HTTP ${response.status}`,
+          error: `AGER XLS вернул HTTP ${response.status}`,
         },
         { status: 500 }
       );
     }
 
-    const xml = await response.text();
+    const arrayBuffer = await response.arrayBuffer();
 
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-      textNodeName: "#text",
-      isArray: (name) =>
-        name === "offer" ||
-        name === "picture" ||
-        name === "param" ||
-        name === "category",
+    const workbook = XLSX.read(Buffer.from(arrayBuffer), {
+      type: "buffer",
+      cellDates: true,
     });
 
-    const data = parser.parse(xml);
+    const sheetNames = workbook.SheetNames;
 
-    const offers =
-      data?.yml_catalog?.shop?.offers?.offer ?? [];
+    const firstSheetName = sheetNames[0];
 
-    const groupOffers = offers.filter(
-      (item: any) =>
-        String(item["@_group_id"]) === "3537"
-    );
-
-    if (groupOffers.length === 0) {
+    if (!firstSheetName) {
       return Response.json(
         {
           ok: false,
-          error: "Товар group_id=3537 не найден",
+          error: "В XLS нет листов",
         },
-        { status: 404 }
+        { status: 500 }
       );
     }
 
-    const firstOffer = groupOffers[0];
+    const worksheet = workbook.Sheets[firstSheetName];
 
-    const pictures = firstOffer.picture ?? [];
+    const rows = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: null,
+      raw: false,
+    }) as unknown[][];
+
+    const headers = rows[0] ?? [];
+
+    const firstRows = rows.slice(0, 6);
 
     return Response.json({
       ok: true,
 
-      groupId: firstOffer["@_group_id"] ?? null,
+      fileSizeBytes: arrayBuffer.byteLength,
 
-      offerId: firstOffer["@_id"] ?? null,
+      sheetNames,
 
-      vendorCode: firstOffer.vendorCode ?? null,
+      firstSheet: firstSheetName,
 
-      name: firstOffer.name ?? null,
+      rowsCount: rows.length,
 
-      picturesCount: pictures.length,
+      columnsCount: headers.length,
 
-      pictures,
+      headers,
 
-      allOffers: groupOffers.map((offer: any) => ({
-        offerId: offer["@_id"] ?? null,
-        size:
-          offer.param?.find(
-            (param: any) =>
-              param["@_name"] ===
-              "Размер"
-          )?.["#text"] ?? null,
-        pictures: offer.picture ?? [],
-      })),
+      firstRows,
     });
   } catch (error) {
-    console.error("AGER pictures test error:", error);
+    console.error("AGER XLS test error:", error);
 
     return Response.json(
       {
