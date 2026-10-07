@@ -33,17 +33,15 @@ export async function GET() {
 
     const data = parser.parse(xml);
 
-    const shop = data?.yml_catalog?.shop;
+    const offers =
+      data?.yml_catalog?.shop?.offers?.offer ?? [];
 
-    const categories = shop?.categories?.category ?? [];
-
-    const offers = shop?.offers?.offer ?? [];
-
-    const offer = offers.find(
-      (item: any) => String(item["@_group_id"]) === "3537"
+    const groupOffers = offers.filter(
+      (item: any) =>
+        String(item["@_group_id"]) === "3537"
     );
 
-    if (!offer) {
+    if (groupOffers.length === 0) {
       return Response.json(
         {
           ok: false,
@@ -53,32 +51,38 @@ export async function GET() {
       );
     }
 
-    const categoryId = String(offer.categoryId ?? "");
+    const firstOffer = groupOffers[0];
 
-    const category = categories.find(
-      (item: any) => String(item["@_id"]) === categoryId
-    );
+    const pictures = firstOffer.picture ?? [];
 
     return Response.json({
       ok: true,
 
-      product: {
-        groupId: offer["@_group_id"] ?? null,
+      groupId: firstOffer["@_group_id"] ?? null,
+
+      offerId: firstOffer["@_id"] ?? null,
+
+      vendorCode: firstOffer.vendorCode ?? null,
+
+      name: firstOffer.name ?? null,
+
+      picturesCount: pictures.length,
+
+      pictures,
+
+      allOffers: groupOffers.map((offer: any) => ({
         offerId: offer["@_id"] ?? null,
-        name: offer.name ?? null,
-        categoryId: offer.categoryId ?? null,
-        categoryName: category?.["#text"] ?? null,
-        categoryParentId: category?.["@_parentId"] ?? null,
-      },
-
-      categoriesCount: categories.length,
-
-      matchedCategory: category ?? null,
-
-      firstCategories: categories.slice(0, 30),
+        size:
+          offer.param?.find(
+            (param: any) =>
+              param["@_name"] ===
+              "Размер"
+          )?.["#text"] ?? null,
+        pictures: offer.picture ?? [],
+      })),
     });
   } catch (error) {
-    console.error("AGER categories test error:", error);
+    console.error("AGER pictures test error:", error);
 
     return Response.json(
       {
