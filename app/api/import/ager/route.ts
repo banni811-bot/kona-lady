@@ -27,12 +27,17 @@ export async function GET() {
       isArray: (name) =>
         name === "offer" ||
         name === "picture" ||
-        name === "param",
+        name === "param" ||
+        name === "category",
     });
 
     const data = parser.parse(xml);
 
-    const offers = data?.yml_catalog?.shop?.offers?.offer ?? [];
+    const shop = data?.yml_catalog?.shop;
+
+    const categories = shop?.categories?.category ?? [];
+
+    const offers = shop?.offers?.offer ?? [];
 
     const offer = offers.find(
       (item: any) => String(item["@_group_id"]) === "3537"
@@ -48,16 +53,32 @@ export async function GET() {
       );
     }
 
+    const categoryId = String(offer.categoryId ?? "");
+
+    const category = categories.find(
+      (item: any) => String(item["@_id"]) === categoryId
+    );
+
     return Response.json({
       ok: true,
-      groupId: offer["@_group_id"] ?? null,
-      offerId: offer["@_id"] ?? null,
-      vendorCode: offer.vendorCode ?? null,
-      name: offer.name ?? null,
-      description: offer.description ?? null,
+
+      product: {
+        groupId: offer["@_group_id"] ?? null,
+        offerId: offer["@_id"] ?? null,
+        name: offer.name ?? null,
+        categoryId: offer.categoryId ?? null,
+        categoryName: category?.["#text"] ?? null,
+        categoryParentId: category?.["@_parentId"] ?? null,
+      },
+
+      categoriesCount: categories.length,
+
+      matchedCategory: category ?? null,
+
+      firstCategories: categories.slice(0, 30),
     });
   } catch (error) {
-    console.error("AGER measurements test error:", error);
+    console.error("AGER categories test error:", error);
 
     return Response.json(
       {
