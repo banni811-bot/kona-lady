@@ -1,499 +1,246 @@
+import { NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 
-const XML_URL =
-  "http://ager.ua/download/catalog_ua.xml";
+const XML_URL = "http://ager.ua/download/catalog_ua.xml";
 
-const TEST_GROUP_ID = "138845";
-
-function getParam(
-  offer: any,
-  names: string[]
-): string {
-  const params = Array.isArray(offer?.param)
-    ? offer.param
-    : offer?.param
-      ? [offer.param]
-      : [];
-
-  for (const param of params) {
-    const name = String(param?.["@_name"] ?? "")
-      .trim()
-      .toLowerCase();
-
-    for (const target of names) {
-      if (name === target.trim().toLowerCase()) {
-        return String(
-          param?.["#text"] ?? param ?? ""
-        ).trim();
-      }
-    }
-  }
-
-  return "";
+function toArray<T>(value: T | T[] | undefined | null): T[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
-function getPictures(offer: any): string[] {
-  if (Array.isArray(offer?.picture)) {
-    return offer.picture
-      .map((item: any) => String(item).trim())
-      .filter(Boolean);
-  }
-
-  if (offer?.picture) {
-    return [String(offer.picture).trim()];
-  }
-
-  return [];
+function cleanText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function getStock(offer: any): number {
-  const value = Number(
-    offer?.quantity_in_stock ?? 0
+function parseNumber(value: unknown): number | null {
+  const match = String(value ?? "").match(/[\d.,]+/);
+
+  if (!match) return null;
+
+  const number = Number(
+    match[0]
+      .replace(/\s/g, "")
+      .replace(",", ".")
   );
 
-  return Number.isFinite(value) ? value : 0;
+  return Number.isFinite(number) ? number : null;
 }
 
-function getDescription(offer: any): string {
-  return String(
-    offer?.description ?? ""
-  ).trim();
+function normalizeSize(value: unknown): string {
+  return cleanText(value).toUpperCase();
 }
 
-function getCategoryId(offer: any): string {
-  return String(
-    offer?.categoryId ?? ""
-  ).trim();
+function extractMeasurements(description: string) {
+  const result: Record<
+    string,
+    {
+      length: number | null;
+      sleeve: number | null;
+      bust: number | null;
+      shoulder: number | null;
+      waist: number | null;
+      hips: number | null;
+    }
+  > = {};
+
+  const sizeRowMatch = description.match(
+    /<tr[^>]*>[\s\S]*?<td[^>]*>Розмір<\/td>([\s\S]*?)<\/tr>/i
+  );
+
+  if (!sizeRowMatch) {
+    return [];
+  }
+
+  const sizeCells = [
+    ...sizeRowMatch[1].matchAll(
+      /<td[^>]*>([\s\S]*?)<\/td>/gi
+    ),
+  ].map((match) => cleanText(match[1]));
+
+  if (sizeCells.length === 0) {
+    return [];
+  }
+
+  const sizes = sizeCells.map(normalizeSize);
+
+  const rows = [
+    {
+      key: "length",
+      labels: ["Довжина виробу"],
+    },
+    {
+      key: "sleeve",
+      labels: ["Довжина рукава"],
+    },
+    {
+      key: "bust",
+      labels: ["Напівобхват грудей"],
+    },
+    {
+      key: "shoulder",
+      labels: ["Ширина плечей"],
+    },
+    {
+      key: "waist",
+      labels: ["Напівобхват пояса", "Напівобхват талії"],
+    },
+    {
+      key: "hips",
+      labels: ["Напівобхват стегон"],
+    },
+  ] as const;
+
+  for (const row of rows) {
+    let rowMatch: RegExpMatchArray | null = null;
+
+    for (const label of row.labels) {
+      rowMatch = description.match(
+        new RegExp(
+          `<tr[^>]*>[\\s\\S]*?<td[^>]*>${label}[\\s\\S]*?<\\/td>([\\s\\S]*?)<\\/tr>`,
+          "i"
+        )
+      );
+
+      if (rowMatch) break;
+    }
+
+    if (!rowMatch) continue;
+
+    const cells = [
+      ...rowMatch[1].matchAll(
+        /<td[^>]*>([\s\S]*?)<\/td>/gi
+      ),
+    ].map((match) => parseNumber(cleanText(match[1])));
+
+    sizes.forEach((size, index) => {
+      if (!result[size]) {
+        result[size] = {
+          length: null,
+          sleeve: null,
+          bust: null,
+          shoulder: null,
+          waist: null,
+          hips: null,
+        };
+      }
+
+      result[size][row.key] = cells[index] ?? null;
+    });
+  }
+
+  return Object.entries(result).map(([size, values]) => ({
+    size,
+    ...values,
+  }));
 }
 
 export async function GET() {
   try {
-    // ---------------------------------------------------------
-    // 1. Загружаем XML
-    // ---------------------------------------------------------
-
     const response = await fetch(XML_URL, {
       cache: "no-store",
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Ошибка загрузки XML: ${response.status} ${response.statusText}`
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `AGER XML HTTP ${response.status}`,
+        },
+        { status: 500 }
       );
     }
 
-    const xmlText = await response.text();
-
-    // ---------------------------------------------------------
-    // 2. Парсим XML
-    // ---------------------------------------------------------
+    const xml = await response.text();
 
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: "@_",
       textNodeName: "#text",
-      parseTagValue: false,
+      parseTagValue: true,
       trimValues: true,
     });
 
-    const parsed = parser.parse(xmlText);
+    const parsed = parser.parse(xml);
 
-    const offersRaw =
-      parsed?.yml_catalog?.shop?.offers?.offer;
-
-    const offers = Array.isArray(offersRaw)
-      ? offersRaw
-      : offersRaw
-        ? [offersRaw]
-        : [];
-
-    // ---------------------------------------------------------
-    // 3. Находим один полноценный товар
-    // ---------------------------------------------------------
-
-    const productOffers = offers.filter(
-      (offer: any) =>
-        String(
-          offer?.["@_group_id"] ?? ""
-        ).trim() === TEST_GROUP_ID
+    const offers = toArray(
+      parsed?.yml_catalog?.shop?.offers?.offer
     );
 
-    if (!productOffers.length) {
-      throw new Error(
-        `group_id ${TEST_GROUP_ID} не найден`
+    const groupId = "138845";
+
+    const groupOffers = offers.filter(
+      (offer: any) =>
+        String(offer?.["@_group_id"] ?? "") === groupId
+    );
+
+    if (groupOffers.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Group ${groupId} not found`,
+        },
+        { status: 404 }
       );
     }
 
-    const firstOffer = productOffers[0];
+    const firstOffer = groupOffers[0];
 
-    // ---------------------------------------------------------
-    // 4. Собираем общую информацию о товаре
-    // ---------------------------------------------------------
-
-    const product = {
-      groupId: TEST_GROUP_ID,
-
-      name:
-        firstOffer?.name ?? null,
-
-      vendorCode:
-        firstOffer?.vendorCode ?? null,
-
-      sku:
-        firstOffer?.sku ?? null,
-
-      categoryId:
-        getCategoryId(firstOffer),
-
-      categoryName:
-        firstOffer?.categoryName ?? null,
-
-      categoryParentId:
-        firstOffer?.categoryParentId ?? null,
-
-      categoryParentName:
-        firstOffer?.categoryParentName ?? null,
-
-      url:
-        firstOffer?.url ?? null,
-
-      description:
-        getDescription(firstOffer),
-
-      brand:
-        getParam(firstOffer, [
-          "Бренд",
-        ]),
-
-      manufacturer:
-        getParam(firstOffer, [
-          "Виробник",
-          "Производитель",
-        ]),
-
-      country:
-        getParam(firstOffer, [
-          "Країна виробник",
-          "Страна производитель",
-        ]),
-
-      gender:
-        getParam(firstOffer, [
-          "Стать",
-          "Пол",
-          "Gender",
-        ]),
-
-      material:
-        getParam(firstOffer, [
-          "Матеріал",
-          "Материал",
-        ]),
-
-      composition:
-        getParam(firstOffer, [
-          "Склад",
-          "Состав",
-        ]),
-
-      season:
-        getParam(firstOffer, [
-          "Сезон",
-          "Сезонність",
-          "Сезонность",
-        ]),
-
-      style:
-        getParam(firstOffer, [
-          "Стиль",
-        ]),
-
-      sleeve:
-        getParam(firstOffer, [
-          "Довжина рукава",
-          "Длина рукава",
-        ]),
-
-      length:
-        getParam(firstOffer, [
-          "Довжина",
-          "Длина",
-        ]),
-
-      neckline:
-        getParam(firstOffer, [
-          "Виріз",
-          "Вырез",
-        ]),
-
-      closure:
-        getParam(firstOffer, [
-          "Застібка",
-          "Застежка",
-        ]),
-
-      fit:
-        getParam(firstOffer, [
-          "Особливості крою",
-          "Особенности кроя",
-        ]),
-
-      fabricFeatures:
-        getParam(firstOffer, [
-          "Особливості тканини",
-          "Особенности ткани",
-        ]),
-
-      color:
-        getParam(firstOffer, [
-          "Колір",
-          "Цвет",
-        ]),
-
-      sizeGroup:
-        getParam(firstOffer, [
-          "Розмірна група",
-          "Размерная группа",
-        ]),
-
-      pictures: getPictures(firstOffer),
-
-      // Цена AGER и будущая цена KONA LADY
-      agerPrice:
-        Number(firstOffer?.price ?? 0),
-
-      konaLadyPrice:
-        Math.ceil(
-          Number(firstOffer?.price ?? 0) * 1.25
-        ),
-    };
-
-    // ---------------------------------------------------------
-    // 5. Собираем ВСЕ варианты этого group_id
-    // ---------------------------------------------------------
-
-    const variants = productOffers.map(
-      (offer: any) => ({
-        offerId:
-          offer?.["@_id"] ?? null,
-
-        available:
-          String(
-            offer?.["@_available"] ?? ""
-          ),
-
-        groupId:
-          offer?.["@_group_id"] ?? null,
-
-        sku:
-          offer?.sku ?? null,
-
-        vendorCode:
-          offer?.vendorCode ?? null,
-
-        name:
-          offer?.name ?? null,
-
-        agerPrice:
-          Number(offer?.price ?? 0),
-
-        konaLadyPrice:
-          Math.ceil(
-            Number(offer?.price ?? 0) * 1.25
-          ),
-
-        oldPrice:
-          Number(offer?.oldprice ?? 0),
-
-        color:
-          getParam(offer, [
-            "Колір",
-            "Цвет",
-          ]),
-
-        size:
-          getParam(offer, [
-            "Розмір",
-            "Международный размер",
-            "Размеры мужских рубашек",
-            "Размер",
-          ]),
-
-        stockQuantity:
-          getStock(offer),
-
-        isAvailable:
-          String(
-            offer?.["@_available"] ?? ""
-          ) === "true",
-
-        pictures:
-          getPictures(offer),
-      })
+    const description = String(
+      firstOffer?.description ?? ""
     );
 
-    // ---------------------------------------------------------
-    // 6. Суммарный остаток
-    // ---------------------------------------------------------
+    const measurements = extractMeasurements(description);
 
-    const totalStock = variants.reduce(
-      (sum: number, variant: any) =>
-        sum + variant.stockQuantity,
-      0
-    );
-
-    // ---------------------------------------------------------
-    // 7. Измерения
-    // ---------------------------------------------------------
-
-    const measurements = variants
-      .map((variant: any) => {
-        const offer = productOffers.find(
-          (item: any) =>
-            String(
-              item?.["@_id"] ?? ""
-            ) ===
-            String(
-              variant.offerId ?? ""
-            )
-        );
-
-        if (!offer) {
-          return null;
-        }
-
-        const getMeasurement = (
-          names: string[]
-        ): string | null => {
-          const value = getParam(
-            offer,
-            names
-          );
-
-          return value || null;
-        };
-
-        return {
-          offerId: variant.offerId,
-
-          size: variant.size,
-
-          bust:
-            getMeasurement([
-              "Напівобхват грудей",
-              "Полуобхват груди",
-            ]),
-
-          waist:
-            getMeasurement([
-              "Напівобхват пояса",
-              "Полуобхват пояса",
-            ]),
-
-          hips:
-            getMeasurement([
-              "Напівобхват стегон",
-              "Полуобхват бедер",
-            ]),
-
-          length:
-            getMeasurement([
-              "Довжина виробу",
-              "Длина изделия",
-            ]),
-
-          sleeve:
-            getMeasurement([
-              "Довжина рукава",
-              "Длина рукава",
-            ]),
-
-          shoulder:
-            getMeasurement([
-              "Ширина плечей",
-              "Ширина плеч",
-            ]),
-        };
-      })
-      .filter(Boolean);
-
-    // ---------------------------------------------------------
-    // 8. Возвращаем полный диагностический результат
-    // ---------------------------------------------------------
-
-    return Response.json({
+    return NextResponse.json({
       ok: true,
+      test: "AGER XML measurements parser",
 
-      test:
-        "AGER XML full product card",
+      groupId,
 
-      xml: {
-        fileSizeBytes:
-          Buffer.byteLength(
-            xmlText,
-            "utf8"
-          ),
-
-        offersCount:
-          offers.length,
+      source: {
+        xmlUrl: XML_URL,
+        fileSizeBytes: Buffer.byteLength(xml, "utf8"),
+        offersCount: offers.length,
       },
 
-      product,
-
-      variants,
-
-      totalStock,
+      product: {
+        name: firstOffer?.name ?? null,
+        vendorCode: firstOffer?.vendorCode ?? null,
+        color:
+          firstOffer?.param?.find?.(
+            (param: any) =>
+              String(param?.["@_name"] ?? "")
+                .toLowerCase()
+                .includes("колір")
+          )?.["#text"] ?? null,
+      },
 
       measurements,
 
       checks: {
-        variantsCount:
-          variants.length,
-
-        picturesCount:
-          product.pictures.length,
-
-        hasDescription:
-          Boolean(product.description),
-
-        hasBrand:
-          Boolean(product.brand),
-
-        hasMaterial:
-          Boolean(product.material),
-
-        hasComposition:
-          Boolean(product.composition),
-
-        hasSeason:
-          Boolean(product.season),
-
-        hasGender:
-          Boolean(product.gender),
-
-        hasCategoryId:
-          Boolean(product.categoryId),
-
-        konaLadyPriceFormula:
-          "ceil(AGER price × 1.25)",
+        variantsFound: groupOffers.length,
+        measurementsFound: measurements.length,
+        sizes: measurements.map((item) => item.size),
+        parserWorks: measurements.length > 0,
       },
     });
-  } catch (error: any) {
-    console.error(
-      "AGER FULL PRODUCT TEST ERROR:",
-      error
-    );
+  } catch (error) {
+    console.error("AGER measurements test error:", error);
 
-    return Response.json(
+    return NextResponse.json(
       {
         ok: false,
         error:
-          error?.message ||
-          String(error),
+          error instanceof Error
+            ? error.message
+            : "Unknown error",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
