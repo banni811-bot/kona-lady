@@ -38,14 +38,32 @@ function normalizeColor(value: unknown): string {
   return normalize(value);
 }
 
+/**
+ * Из:
+ * "Cвитер мужской новогодний 214R21302_Джинс"
+ * получаем:
+ * "214r21302"
+ *
+ * Это важно, потому что XML использует vendorCode:
+ * "214R21302"
+ */
 function baseArticle(value: unknown): string {
   const valueText = text(value);
 
   if (!valueText) return "";
 
   const parts = valueText.split("_");
+  const firstPart = parts[0].trim();
 
-  return normalize(parts[0]);
+  const articleMatch = firstPart.match(
+    /([a-zа-яіїєґ0-9]+)$/i
+  );
+
+  if (!articleMatch) {
+    return normalize(firstPart);
+  }
+
+  return normalize(articleMatch[1]);
 }
 
 function colorFromArticle(value: unknown): string {
@@ -330,117 +348,145 @@ function getXlsRows(buffer: ArrayBuffer) {
         indexes.code >= 0
           ? text(row[indexes.code])
           : "",
+
       name:
         indexes.name >= 0
           ? text(row[indexes.name])
           : "",
+
       article1:
         indexes.article1 >= 0
           ? text(row[indexes.article1])
           : "",
+
       article2:
         indexes.article2 >= 0
           ? text(row[indexes.article2])
           : "",
+
       barcode:
         indexes.barcode >= 0
           ? text(row[indexes.barcode])
           : "",
+
       nameUa:
         indexes.nameUa >= 0
           ? text(row[indexes.nameUa])
           : "",
+
       nameRu:
         indexes.nameRu >= 0
           ? text(row[indexes.nameRu])
           : "",
+
       product:
         indexes.product >= 0
           ? text(row[indexes.product])
           : "",
+
       brand:
         indexes.brand >= 0
           ? text(row[indexes.brand])
           : "",
+
       type:
         indexes.type >= 0
           ? text(row[indexes.type])
           : "",
+
       size:
         indexes.size >= 0
           ? text(row[indexes.size])
           : "",
+
       colorUa:
         indexes.colorUa >= 0
           ? text(row[indexes.colorUa])
           : "",
+
       colorRu:
         indexes.colorRu >= 0
           ? text(row[indexes.colorRu])
           : "",
+
       country:
         indexes.country >= 0
           ? text(row[indexes.country])
           : "",
+
       gender:
         indexes.gender >= 0
           ? text(row[indexes.gender])
           : "",
+
       season:
         indexes.season >= 0
           ? text(row[indexes.season])
           : "",
+
       composition:
         indexes.composition >= 0
           ? text(row[indexes.composition])
           : "",
+
       measurements:
         indexes.measurements >= 0
           ? text(row[indexes.measurements])
           : "",
+
       quantity:
         indexes.quantity >= 0
           ? parseNumber(
               row[indexes.quantity]
             ) ?? 0
           : 0,
+
       dropshipPrice:
         indexes.dropshipPrice >= 0
           ? parseNumber(
               row[indexes.dropshipPrice]
             )
           : null,
+
       retailPrice:
         indexes.retailPrice >= 0
           ? parseNumber(
               row[indexes.retailPrice]
             )
           : null,
+
       wholesalePrice:
         indexes.wholesalePrice >= 0
           ? parseNumber(
               row[indexes.wholesalePrice]
             )
           : null,
+
       photos: [
         indexes.photo1 >= 0
           ? text(row[indexes.photo1])
           : "",
+
         indexes.photo2 >= 0
           ? text(row[indexes.photo2])
           : "",
+
         indexes.photo3 >= 0
           ? text(row[indexes.photo3])
           : "",
+
         indexes.photo4 >= 0
           ? text(row[indexes.photo4])
           : "",
+
         indexes.photo5 >= 0
           ? text(row[indexes.photo5])
           : "",
+
         indexes.photo6 >= 0
           ? text(row[indexes.photo6])
           : "",
+
         indexes.photo7 >= 0
           ? text(row[indexes.photo7])
           : "",
@@ -470,6 +516,7 @@ export async function GET() {
         fetch(XLS_URL, {
           cache: "no-store",
         }),
+
         fetch(XML_URL, {
           cache: "no-store",
         }),
@@ -517,19 +564,7 @@ export async function GET() {
       parsed?.yml_catalog?.shop?.offers?.offer
     );
 
-    /*
-     * Индекс XML:
-     *
-     * baseArticle + color + size
-     *
-     * Именно эта связка уже была проверена
-     * на реальном AGER каталоге: 10 из 10
-     * тестовых строк нашли уникальный offer.
-     */
-    const xmlIndex = new Map<
-      string,
-      any[]
-    >();
+    const xmlIndex = new Map<string, any[]>();
 
     for (const offer of offers) {
       const vendorCode =
@@ -659,9 +694,11 @@ export async function GET() {
                 offerId:
                   offer?.["@_id"] ??
                   null,
+
                 groupId:
                   offer?.["@_group_id"] ??
                   null,
+
                 vendorCode:
                   offer?.vendorCode ??
                   null,
@@ -708,23 +745,29 @@ export async function GET() {
         Math.max(
           0,
           Math.floor(
-            Number(row.quantity ?? 0)
+            Number(
+              row.quantity ?? 0
+            )
           )
         );
 
       product.variants.push({
         offerId:
           text(offer?.["@_id"]),
+
         sku:
           text(offer?.sku),
+
         vendorCode:
           text(offer?.vendorCode),
+
         size:
           text(row.size) ||
           getParam(offer, [
             "розмір",
             "размер",
           ]),
+
         color:
           text(row.colorUa) ||
           text(row.colorRu) ||
@@ -732,7 +775,9 @@ export async function GET() {
             "колір",
             "цвет",
           ]),
+
         stockQuantity: stock,
+
         isAvailable:
           stock > 0 &&
           String(
@@ -740,9 +785,12 @@ export async function GET() {
               ""
           ).toLowerCase() ===
             "true",
+
         agerPrice,
+
         konaLadyPrice:
           konaPrice(agerPrice),
+
         oldPrice:
           parseNumber(
             offer?.oldprice
@@ -1071,14 +1119,19 @@ export async function GET() {
               (variant) => ({
                 offerId:
                   variant.offerId,
+
                 size:
                   variant.size,
+
                 color:
                   variant.color,
+
                 stockQuantity:
                   variant.stockQuantity,
+
                 agerPrice:
                   variant.agerPrice,
+
                 konaLadyPrice:
                   variant.konaLadyPrice,
               })
