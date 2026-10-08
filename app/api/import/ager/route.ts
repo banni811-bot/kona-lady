@@ -676,9 +676,9 @@ export async function GET() {
         matches[0];
 
       const groupId =
-        text(offer.group_id) ||
-        text(offer.groupId);
-
+  text(offer.group_id) ||
+  text(offer.groupId) ||
+  text(offer["@_group_id"]);
       const offerId =
         text(offer["@_id"]) ||
         text(offer.offerId);
