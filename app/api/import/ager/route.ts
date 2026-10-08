@@ -403,55 +403,32 @@ function stripHtml(
 }
 
 /**
- * Парсит таблицу измерений AGER.
+ * AGER хранит замеры не по строкам размеров,
+ * а транспонированной таблицей:
  *
- * В таблице AGER обычно:
+ * Розмір             | M  | L  | XL
+ * Довжина виробу     | 66 | 67 | 68
+ * Довжина рукава     | 60 | 61 | 62
+ * Напівобхват грудей | 48 | 50 | 52
+ * Ширина плечей      | 46 | 47 | 48
  *
- * Размер | Довжина виробу | Довжина рукава |
- * Напівобхват грудей | Ширина плечей ...
- *
- * Например:
- *
- * M | 66 | 60 | 48 | 46
- * L | 67 | 61 | 50 | 47
- * XL | 68 | 62 | 52 | 48
- *
- * Заголовок таблицы НЕ является размером,
- * поэтому его пропускаем.
+ * Поэтому сначала получаем список размеров
+ * из строки "Розмір", а потом собираем
+ * значения каждой характеристики по индексам.
  */
 function parseMeasurements(
   description: string
 ): Measurement[] {
   if (!description) return [];
 
-  const measurements: Measurement[] =
-    [];
+  const rows: string[][] = [];
 
   const rowRegex =
     /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
 
-  const rows =
-    description.matchAll(rowRegex);
-
-  const headerWords = [
-    "розмір",
-    "размер",
-    "size",
-    "довжина виробу",
-    "длина изделия",
-    "довжина рукава",
-    "длина рукава",
-    "напівобхват грудей",
-    "полуобхват груди",
-    "ширина плечей",
-    "ширина плеч",
-    "обхват талії",
-    "обхват талии",
-    "обхват стегон",
-    "обхват бедер",
-  ];
-
-  for (const rowMatch of rows) {
+  for (const rowMatch of description.matchAll(
+    rowRegex
+  )) {
     const rowHtml = rowMatch[1];
 
     const cells = Array.from(
@@ -462,127 +439,218 @@ function parseMeasurements(
       stripHtml(match[1])
     );
 
-    if (cells.length < 2) {
-      continue;
+    if (cells.length >= 2) {
+      rows.push(cells);
     }
+  }
 
-    const firstCell =
-      normalize(cells[0]);
+  if (rows.length === 0) {
+    return [];
+  }
 
-    /*
-     * Это строка заголовков,
-     * а не строка с конкретным размером.
-     */
-    if (
-      headerWords.includes(
-        firstCell
+  const normalizedFirstCells =
+    rows.map((row) =>
+      normalize(row[0])
+    );
+
+  const sizeHeaderIndex =
+    normalizedFirstCells.findIndex(
+      (value) =>
+        value === "розмір" ||
+        value === "размер" ||
+        value === "size"
+    );
+
+  if (
+    sizeHeaderIndex === -1
+  ) {
+    return [];
+  }
+
+  const sizeRow =
+    rows[sizeHeaderIndex];
+
+  const sizes =
+    sizeRow
+      .slice(1)
+      .map((value) =>
+        normalizeSize(value)
       )
-    ) {
-      continue;
-    }
+      .filter(Boolean);
 
-    /*
-     * Размер должен быть похож на:
-     * S, M, L, XL, XXL, 42, 44, 46,
-     * 42-44 и т.п.
-     *
-     * Не принимаем длинные слова
-     * из заголовков таблицы.
-     */
-    const sizeCandidate =
-      cells[0]
-        .replace(
-          /[|:]/g,
-          ""
-        )
-        .trim();
+  if (sizes.length === 0) {
+    return [];
+  }
 
-    if (
-      !sizeCandidate ||
-      sizeCandidate.length > 15
-    ) {
-      continue;
-    }
-
-    if (
-      headerWords.includes(
-        normalize(sizeCandidate)
-      )
-    ) {
-      continue;
-    }
-
-    const size =
-      normalizeSize(
-        sizeCandidate
-      );
-
-    if (!size) {
-      continue;
-    }
-
-    /*
-     * В строке измерений после размера
-     * должны быть числовые значения.
-     */
-    const numbers =
-      cells
-        .slice(1)
-        .map((cell) =>
-          asNumber(cell)
-        )
-        .filter(
-          (
-            value
-          ): value is number =>
-            value !== null
-        );
-
-    if (numbers.length < 1) {
-      continue;
-    }
-
-    /*
-     * Минимально ожидаем:
-     * длина изделия.
-     *
-     * Остальные поля оставляем null,
-     * если AGER их не дал.
-     */
-    measurements.push({
+  const result: Measurement[] =
+    sizes.map((size) => ({
       size,
-      length:
-        numbers[0] ?? null,
-      sleeve:
-        numbers[1] ?? null,
-      bust:
-        numbers[2] ?? null,
-      shoulder:
-        numbers[3] ?? null,
-      waist:
-        numbers[4] ?? null,
-      hips:
-        numbers[5] ?? null,
-    });
-  }
+      length: null,
+      sleeve: null,
+      bust: null,
+      shoulder: null,
+      waist: null,
+      hips: null,
+    }));
 
-  const unique =
-    new Map<
-      string,
-      Measurement
-    >();
+  function setField(
+    field:
+      | "length"
+      | "sleeve"
+      | "bust"
+      | "shoulder"
+      | "waist"
+      | "hips",
+    values: string[]
+  ) {
+    for (
+      let index = 0;
+      index < result.length;
+      index++
+    ) {
+      const value =
+        values[index] ?? "";
 
-  for (const item of measurements) {
-    if (!unique.has(item.size)) {
-      unique.set(
-        item.size,
-        item
-      );
+      result[index][field] =
+        asNumber(value);
     }
   }
 
-  return Array.from(
-    unique.values()
+  for (
+    let rowIndex = 0;
+    rowIndex < rows.length;
+    rowIndex++
+  ) {
+    if (
+      rowIndex ===
+      sizeHeaderIndex
+    ) {
+      continue;
+    }
+
+    const row =
+      rows[rowIndex];
+
+    const label =
+      normalize(row[0]);
+
+    const values =
+      row.slice(1);
+
+    if (
+      label.includes(
+        "довжина виробу"
+      ) ||
+      label.includes(
+        "длина изделия"
+      )
+    ) {
+      setField(
+        "length",
+        values
+      );
+      continue;
+    }
+
+    if (
+      label.includes(
+        "довжина рукава"
+      ) ||
+      label.includes(
+        "длина рукава"
+      )
+    ) {
+      setField(
+        "sleeve",
+        values
+      );
+      continue;
+    }
+
+    if (
+      label.includes(
+        "напівобхват грудей"
+      ) ||
+      label.includes(
+        "полуобхват груди"
+      ) ||
+      label.includes(
+        "напівобхват грудної клітини"
+      )
+    ) {
+      setField(
+        "bust",
+        values
+      );
+      continue;
+    }
+
+    if (
+      label.includes(
+        "ширина плечей"
+      ) ||
+      label.includes(
+        "ширина плеч"
+      )
+    ) {
+      setField(
+        "shoulder",
+        values
+      );
+      continue;
+    }
+
+    if (
+      label.includes(
+        "обхват талії"
+      ) ||
+      label.includes(
+        "обхват талии"
+      ) ||
+      label.includes(
+        "напівобхват талії"
+      ) ||
+      label.includes(
+        "полуобхват талии"
+      )
+    ) {
+      setField(
+        "waist",
+        values
+      );
+      continue;
+    }
+
+    if (
+      label.includes(
+        "обхват стегон"
+      ) ||
+      label.includes(
+        "обхват бедер"
+      ) ||
+      label.includes(
+        "напівобхват стегон"
+      ) ||
+      label.includes(
+        "полуобхват бедер"
+      )
+    ) {
+      setField(
+        "hips",
+        values
+      );
+      continue;
+    }
+  }
+
+  return result.filter(
+    (item) =>
+      item.length !== null ||
+      item.sleeve !== null ||
+      item.bust !== null ||
+      item.shoulder !== null ||
+      item.waist !== null ||
+      item.hips !== null
   );
 }
 
