@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "KONA LADY",
   description: "Интернет-магазин женской одежды и аксессуаров",
+  icons: {
+    icon: "/kona-lady-logo.png",
+    shortcut: "/kona-lady-logo.png",
+    apple: "/kona-lady-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1063,9 +1063,17 @@ export default function Home() {
       <header className="border-b border-purple-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3 px-4 py-3 md:px-8 md:py-4">
           <div className="min-w-0">
-            <div className="text-xl font-black tracking-tight text-purple-700 md:text-2xl">
-              ✦ KONA LADY
-            </div>
+            <a
+              href="/"
+              aria-label="KONA LADY"
+              className="block w-fit cursor-pointer"
+            >
+              <img
+                src="/kona-lady-logo.png"
+                alt="KONA LADY"
+                className="h-12 w-auto object-contain md:h-14"
+              />
+            </a>
 
             <div className="hidden text-xs text-zinc-500 sm:block">
               Начни свой стиль с KONA
