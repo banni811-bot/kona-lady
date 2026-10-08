@@ -130,7 +130,6 @@ function normalizeColor(value: unknown): string {
     [/молочні/g, "молочный"],
 
     [/джинсовий/g, "джинс"],
-    [/джинсовa/g, "джинс"],
 
     [/темно-/g, "темный-"],
     [/світло-/g, "светлый-"],
@@ -154,19 +153,6 @@ function normalizeSize(value: unknown): string {
     .replace(/размер/g, "");
 }
 
-/**
- * Извлекает полноценный артикул из Артикул1/Артикул2.
- *
- * Примеры:
- * "Свитер мужской новогодний 214R21302_Джинс"
- * -> "214r21302"
- *
- * "Блуза 230R101-1_Белый"
- * -> "230r101-1"
- *
- * "Блуза 230R1122-10-U-11 -уценка_Зеленый"
- * -> "230r1122-10-u-11"
- */
 function extractArticleFromField(value: unknown): string {
   const raw = text(value);
 
@@ -179,17 +165,6 @@ function extractArticleFromField(value: unknown): string {
     .replace(/\s+уценка\s*$/i, "")
     .trim();
 
-  /*
-   * Ищем код, начинающийся с буквы или цифры,
-   * но обязательно содержащий буквы и цифры.
-   *
-   * Поддерживаются:
-   * 214R21302
-   * 230R101-1
-   * 230R1122-10
-   * 230R1122-10-U-11
-   * AG-0010763
-   */
   const articleMatches = cleaned.match(
     /[A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+(?:-[A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+)*/g
   );
@@ -201,7 +176,9 @@ function extractArticleFromField(value: unknown): string {
   const candidates = articleMatches
     .map((item) => item.trim())
     .filter((item) => {
-      const hasLetter = /[A-Za-zА-Яа-яІіЇїЄєҐґ]/.test(item);
+      const hasLetter =
+        /[A-Za-zА-Яа-яІіЇїЄєҐґ]/.test(item);
+
       const hasNumber = /[0-9]/.test(item);
 
       return hasLetter && hasNumber;
@@ -211,14 +188,9 @@ function extractArticleFromField(value: unknown): string {
     return "";
   }
 
-  /*
-   * Берём последний подходящий код.
-   * Для:
-   * "Свитер мужской новогодний 214R21302"
-   * это будет именно "214R21302",
-   * а не "новогодний".
-   */
-  return normalize(candidates[candidates.length - 1]);
+  return normalize(
+    candidates[candidates.length - 1]
+  );
 }
 
 function baseArticle(
@@ -241,81 +213,135 @@ function ceilKonaPrice(value: unknown): number {
 }
 
 function asNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return null;
   }
 
-  const normalized = String(value)
+  const raw = String(value).trim();
+
+  if (!raw) return null;
+
+  const normalized = raw
     .replace(",", ".")
     .replace(/[^\d.-]/g, "");
 
+  if (!normalized) return null;
+
   const number = Number(normalized);
 
-  return Number.isFinite(number) ? number : null;
+  return Number.isFinite(number)
+    ? number
+    : null;
 }
 
-function parseXlsRows(workbook: XLSX.WorkBook): AnyRecord[] {
+function parseXlsRows(
+  workbook: XLSX.WorkBook
+): AnyRecord[] {
   const sheet =
     workbook.Sheets["TDSheet"] ??
-    workbook.Sheets[workbook.SheetNames[0]];
+    workbook.Sheets[
+      workbook.SheetNames[0]
+    ];
 
   if (!sheet) {
-    throw new Error("Лист TDSheet не найден");
+    throw new Error(
+      "Лист TDSheet не найден"
+    );
   }
 
-  const rows = XLSX.utils.sheet_to_json(sheet, {
-    header: 1,
-    defval: null,
-    raw: false,
-  }) as unknown[][];
+  const rows =
+    XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: null,
+      raw: false,
+    }) as unknown[][];
 
-  const headerIndex = rows.findIndex((row) =>
-    row.some((cell) => text(cell) === "Код")
-  );
+  const headerIndex =
+    rows.findIndex((row) =>
+      row.some(
+        (cell) =>
+          text(cell) === "Код"
+      )
+    );
 
   if (headerIndex === -1) {
-    throw new Error("Не найдена строка заголовков XLS");
+    throw new Error(
+      "Не найдена строка заголовков XLS"
+    );
   }
 
-  const headers = rows[headerIndex].map((item) => text(item));
+  const headers =
+    rows[headerIndex].map((item) =>
+      text(item)
+    );
 
   return rows
     .slice(headerIndex + 1)
-    .filter((row) => row.some((cell) => text(cell)))
+    .filter((row) =>
+      row.some((cell) =>
+        text(cell)
+      )
+    )
     .map((row) => {
       const result: AnyRecord = {};
 
-      headers.forEach((header, index) => {
-        if (header) {
-          result[header] = row[index] ?? null;
+      headers.forEach(
+        (header, index) => {
+          if (header) {
+            result[header] =
+              row[index] ?? null;
+          }
         }
-      });
+      );
 
       return result;
     });
 }
 
-function xmlArray<T>(value: T | T[] | undefined | null): T[] {
-  if (value === undefined || value === null) return [];
-  return Array.isArray(value) ? value : [value];
+function xmlArray<T>(
+  value:
+    | T
+    | T[]
+    | undefined
+    | null
+): T[] {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return [];
+  }
+
+  return Array.isArray(value)
+    ? value
+    : [value];
 }
 
 function getXmlParam(
   offer: AnyRecord,
   names: string[]
 ): string {
-  const params = xmlArray(offer.param);
+  const params =
+    xmlArray(offer.param);
 
   for (const param of params) {
-    const name = normalize(param?.["@_name"]);
+    const name = normalize(
+      param?.["@_name"]
+    );
 
     if (
       names.some(
-        (item) => name === normalize(item)
+        (item) =>
+          name === normalize(item)
       )
     ) {
       return text(
-        param?.["#text"] ?? param
+        param?.["#text"] ??
+          param
       );
     }
   }
@@ -323,13 +349,17 @@ function getXmlParam(
   return "";
 }
 
-function getPictures(offer: AnyRecord): string[] {
+function getPictures(
+  offer: AnyRecord
+): string[] {
   return xmlArray(offer.picture)
     .map((item) => text(item))
     .filter(Boolean);
 }
 
-function getDescription(offer: AnyRecord): string {
+function getDescription(
+  offer: AnyRecord
+): string {
   return text(
     offer.description ??
       offer["description_ua"] ??
@@ -337,32 +367,89 @@ function getDescription(offer: AnyRecord): string {
   );
 }
 
-function stripHtml(value: string): string {
+function stripHtml(
+  value: string
+): string {
   return value
-    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(
+      /<br\s*\/?>/gi,
+      "\n"
+    )
     .replace(
       /<\/(p|div|tr|li|h[1-6])>/gi,
       "\n"
     )
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&quot;/gi, '"')
-    .replace(/&amp;/gi, "&")
-    .replace(/\s+/g, " ")
+    .replace(
+      /<[^>]+>/g,
+      " "
+    )
+    .replace(
+      /&nbsp;/gi,
+      " "
+    )
+    .replace(
+      /&quot;/gi,
+      '"'
+    )
+    .replace(
+      /&amp;/gi,
+      "&"
+    )
+    .replace(
+      /\s+/g,
+      " "
+    )
     .trim();
 }
 
+/**
+ * Парсит таблицу измерений AGER.
+ *
+ * В таблице AGER обычно:
+ *
+ * Размер | Довжина виробу | Довжина рукава |
+ * Напівобхват грудей | Ширина плечей ...
+ *
+ * Например:
+ *
+ * M | 66 | 60 | 48 | 46
+ * L | 67 | 61 | 50 | 47
+ * XL | 68 | 62 | 52 | 48
+ *
+ * Заголовок таблицы НЕ является размером,
+ * поэтому его пропускаем.
+ */
 function parseMeasurements(
   description: string
 ): Measurement[] {
   if (!description) return [];
 
-  const measurements: Measurement[] = [];
+  const measurements: Measurement[] =
+    [];
 
   const rowRegex =
     /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
 
-  const rows = description.matchAll(rowRegex);
+  const rows =
+    description.matchAll(rowRegex);
+
+  const headerWords = [
+    "розмір",
+    "размер",
+    "size",
+    "довжина виробу",
+    "длина изделия",
+    "довжина рукава",
+    "длина рукава",
+    "напівобхват грудей",
+    "полуобхват груди",
+    "ширина плечей",
+    "ширина плеч",
+    "обхват талії",
+    "обхват талии",
+    "обхват стегон",
+    "обхват бедер",
+  ];
 
   for (const rowMatch of rows) {
     const rowHtml = rowMatch[1];
@@ -375,87 +462,179 @@ function parseMeasurements(
       stripHtml(match[1])
     );
 
-    if (cells.length < 2) continue;
+    if (cells.length < 2) {
+      continue;
+    }
 
-    const joined = cells.join(" | ");
+    const firstCell =
+      normalize(cells[0]);
 
-    const sizeMatch = joined.match(
-      /(?:розмір|размер|size)\s*[:\-]?\s*([A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+)|^([A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+)\s*\|/i
-    );
+    /*
+     * Это строка заголовков,
+     * а не строка с конкретным размером.
+     */
+    if (
+      headerWords.includes(
+        firstCell
+      )
+    ) {
+      continue;
+    }
 
-    const size = normalizeSize(
-      sizeMatch?.[1] ??
-        sizeMatch?.[2] ??
-        cells[0]
-    );
+    /*
+     * Размер должен быть похож на:
+     * S, M, L, XL, XXL, 42, 44, 46,
+     * 42-44 и т.п.
+     *
+     * Не принимаем длинные слова
+     * из заголовков таблицы.
+     */
+    const sizeCandidate =
+      cells[0]
+        .replace(
+          /[|:]/g,
+          ""
+        )
+        .trim();
 
-    if (!size) continue;
+    if (
+      !sizeCandidate ||
+      sizeCandidate.length > 15
+    ) {
+      continue;
+    }
 
-    const numbers = cells
-      .slice(1)
-      .map((cell) => asNumber(cell))
-      .filter(
-        (value): value is number =>
-          value !== null
+    if (
+      headerWords.includes(
+        normalize(sizeCandidate)
+      )
+    ) {
+      continue;
+    }
+
+    const size =
+      normalizeSize(
+        sizeCandidate
       );
 
-    if (numbers.length < 1) continue;
+    if (!size) {
+      continue;
+    }
 
+    /*
+     * В строке измерений после размера
+     * должны быть числовые значения.
+     */
+    const numbers =
+      cells
+        .slice(1)
+        .map((cell) =>
+          asNumber(cell)
+        )
+        .filter(
+          (
+            value
+          ): value is number =>
+            value !== null
+        );
+
+    if (numbers.length < 1) {
+      continue;
+    }
+
+    /*
+     * Минимально ожидаем:
+     * длина изделия.
+     *
+     * Остальные поля оставляем null,
+     * если AGER их не дал.
+     */
     measurements.push({
       size,
-      length: numbers[0] ?? null,
-      sleeve: numbers[1] ?? null,
-      bust: numbers[2] ?? null,
-      shoulder: numbers[3] ?? null,
-      waist: numbers[4] ?? null,
-      hips: numbers[5] ?? null,
+      length:
+        numbers[0] ?? null,
+      sleeve:
+        numbers[1] ?? null,
+      bust:
+        numbers[2] ?? null,
+      shoulder:
+        numbers[3] ?? null,
+      waist:
+        numbers[4] ?? null,
+      hips:
+        numbers[5] ?? null,
     });
   }
 
-  const unique = new Map<
-    string,
-    Measurement
-  >();
+  const unique =
+    new Map<
+      string,
+      Measurement
+    >();
 
   for (const item of measurements) {
     if (!unique.has(item.size)) {
-      unique.set(item.size, item);
+      unique.set(
+        item.size,
+        item
+      );
     }
   }
 
-  return Array.from(unique.values());
+  return Array.from(
+    unique.values()
+  );
 }
 
 function buildXmlIndex(
   offers: AnyRecord[]
 ) {
-  const index = new Map<
-    string,
-    AnyRecord[]
-  >();
+  const index =
+    new Map<
+      string,
+      AnyRecord[]
+    >();
 
   for (const offer of offers) {
     const vendorCode =
-      text(offer.vendorCode);
+      text(
+        offer.vendorCode
+      );
 
     const color =
-      getXmlParam(offer, [
-        "Цвет",
-        "Колір",
-      ]) ||
-      text(offer.color);
+      getXmlParam(
+        offer,
+        [
+          "Цвет",
+          "Колір",
+        ]
+      ) ||
+      text(
+        offer.color
+      );
 
     const size =
-      getXmlParam(offer, [
-        "Размер",
-        "Розмір",
-      ]) ||
-      text(offer.size);
+      getXmlParam(
+        offer,
+        [
+          "Размер",
+          "Розмір",
+        ]
+      ) ||
+      text(
+        offer.size
+      );
 
     const key = [
-      normalize(vendorCode),
-      normalizeColor(color),
-      normalizeSize(size),
+      normalize(
+        vendorCode
+      ),
+      normalizeColor(
+        color
+      ),
+      normalizeSize(
+        size
+      ),
     ].join("|");
 
     if (
@@ -467,18 +646,25 @@ function buildXmlIndex(
     }
 
     const existing =
-      index.get(key) ?? [];
+      index.get(key) ??
+      [];
 
-    existing.push(offer);
+    existing.push(
+      offer
+    );
 
-    index.set(key, existing);
+    index.set(
+      key,
+      existing
+    );
   }
 
   return index;
 }
 
 export async function GET() {
-  const startedAt = Date.now();
+  const startedAt =
+    Date.now();
 
   try {
     const xlsUrl =
@@ -490,14 +676,17 @@ export async function GET() {
     const [
       xlsResponse,
       xmlResponse,
-    ] = await Promise.all([
-      fetch(xlsUrl, {
-        cache: "no-store",
-      }),
-      fetch(xmlUrl, {
-        cache: "no-store",
-      }),
-    ]);
+    ] =
+      await Promise.all([
+        fetch(xlsUrl, {
+          cache:
+            "no-store",
+        }),
+        fetch(xmlUrl, {
+          cache:
+            "no-store",
+        }),
+      ]);
 
     if (!xlsResponse.ok) {
       throw new Error(
@@ -514,40 +703,51 @@ export async function GET() {
     const [
       xlsBuffer,
       xmlText,
-    ] = await Promise.all([
-      xlsResponse.arrayBuffer(),
-      xmlResponse.text(),
-    ]);
+    ] =
+      await Promise.all([
+        xlsResponse.arrayBuffer(),
+        xmlResponse.text(),
+      ]);
 
-    const workbook = XLSX.read(
-      xlsBuffer,
-      {
-        type: "array",
-      }
-    );
+    const workbook =
+      XLSX.read(
+        xlsBuffer,
+        {
+          type: "array",
+        }
+      );
 
     const xlsRows =
-      parseXlsRows(workbook);
+      parseXlsRows(
+        workbook
+      );
 
     const parser =
       new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: "@_",
-        textNodeName: "#text",
-        isArray: (name) =>
-          [
-            "offer",
-            "picture",
-            "param",
-          ].includes(name),
+        ignoreAttributes:
+          false,
+        attributeNamePrefix:
+          "@_",
+        textNodeName:
+          "#text",
+        isArray:
+          (name) =>
+            [
+              "offer",
+              "picture",
+              "param",
+            ].includes(name),
       });
 
     const xml =
-      parser.parse(xmlText);
+      parser.parse(
+        xmlText
+      );
 
     const offers =
-      xml?.yml_catalog?.shop
-        ?.offers?.offer;
+      xml?.yml_catalog
+        ?.shop?.offers
+        ?.offer;
 
     if (!offers) {
       throw new Error(
@@ -556,10 +756,14 @@ export async function GET() {
     }
 
     const xmlOffers =
-      xmlArray(offers) as AnyRecord[];
+      xmlArray(
+        offers
+      ) as AnyRecord[];
 
     const xmlIndex =
-      buildXmlIndex(xmlOffers);
+      buildXmlIndex(
+        xmlOffers
+      );
 
     const productMap =
       new Map<
@@ -571,18 +775,22 @@ export async function GET() {
     let noMatchRows = 0;
     let multipleMatchRows = 0;
 
-    const noMatchesSample: AnyRecord[] =
-      [];
+    const noMatchesSample:
+      AnyRecord[] = [];
 
-    const multipleMatchesSample: AnyRecord[] =
-      [];
+    const multipleMatchesSample:
+      AnyRecord[] = [];
 
     for (const row of xlsRows) {
       const article1 =
-        text(row["Артикул1 *"]);
+        text(
+          row["Артикул1 *"]
+        );
 
       const article2 =
-        text(row["Артикул2 *"]);
+        text(
+          row["Артикул2 *"]
+        );
 
       const article =
         baseArticle(
@@ -591,21 +799,35 @@ export async function GET() {
         );
 
       const color =
-        text(row["Цвет *"]) ||
-        text(row["Колір *"]);
+        text(
+          row["Цвет *"]
+        ) ||
+        text(
+          row["Колір *"]
+        );
 
       const size =
-        text(row["Розмір *"]) ||
-        text(row["Размер *"]);
+        text(
+          row["Розмір *"]
+        ) ||
+        text(
+          row["Размер *"]
+        );
 
       const normalizedArticle =
-        normalize(article);
+        normalize(
+          article
+        );
 
       const normalizedColor =
-        normalizeColor(color);
+        normalizeColor(
+          color
+        );
 
       const normalizedSize =
-        normalizeSize(size);
+        normalizeSize(
+          size
+        );
 
       const key = [
         normalizedArticle,
@@ -614,13 +836,18 @@ export async function GET() {
       ].join("|");
 
       const matches =
-        xmlIndex.get(key) ?? [];
+        xmlIndex.get(key) ??
+        [];
 
-      if (matches.length === 0) {
+      if (
+        matches.length ===
+        0
+      ) {
         noMatchRows++;
 
         if (
-          noMatchesSample.length < 20
+          noMatchesSample.length <
+          20
         ) {
           noMatchesSample.push({
             code: text(
@@ -639,7 +866,10 @@ export async function GET() {
         continue;
       }
 
-      if (matches.length > 1) {
+      if (
+        matches.length >
+        1
+      ) {
         multipleMatchRows++;
 
         if (
@@ -676,33 +906,56 @@ export async function GET() {
         matches[0];
 
       const groupId =
-  text(offer.group_id) ||
-  text(offer.groupId) ||
-  text(offer["@_group_id"]);
+        text(
+          offer.group_id
+        ) ||
+        text(
+          offer.groupId
+        ) ||
+        text(
+          offer["@_group_id"]
+        );
+
       const offerId =
-        text(offer["@_id"]) ||
-        text(offer.offerId);
+        text(
+          offer["@_id"]
+        ) ||
+        text(
+          offer.offerId
+        );
 
       const vendorCode =
-        text(offer.vendorCode);
+        text(
+          offer.vendorCode
+        );
 
       const name =
-        text(offer.name) ||
+        text(
+          offer.name
+        ) ||
         text(
           row["Наименование"]
         );
 
       const xmlColor =
-        getXmlParam(offer, [
-          "Цвет",
-          "Колір",
-        ]) || color;
+        getXmlParam(
+          offer,
+          [
+            "Цвет",
+            "Колір",
+          ]
+        ) ||
+        color;
 
       const xmlSize =
-        getXmlParam(offer, [
-          "Размер",
-          "Розмір",
-        ]) || size;
+        getXmlParam(
+          offer,
+          [
+            "Размер",
+            "Розмір",
+          ]
+        ) ||
+        size;
 
       const agerPrice =
         asNumber(
@@ -722,11 +975,15 @@ export async function GET() {
 
       const stockQuantity =
         asNumber(
-          row["Кількість *"]
+          row[
+            "Кількість *"
+          ]
         ) ?? 0;
 
       const pictures =
-        getPictures(offer);
+        getPictures(
+          offer
+        );
 
       const description =
         getDescription(
@@ -744,14 +1001,17 @@ export async function GET() {
         );
 
       const variant:
-        VariantPreview = {
-        offerId,
-        size: xmlSize,
-        color: xmlColor,
-        stockQuantity,
-        agerPrice,
-        konaLadyPrice,
-      };
+        VariantPreview =
+        {
+          offerId,
+          size:
+            xmlSize,
+          color:
+            xmlColor,
+          stockQuantity,
+          agerPrice,
+          konaLadyPrice,
+        };
 
       if (!existing) {
         productMap.set(
@@ -760,7 +1020,8 @@ export async function GET() {
             groupId,
             name,
             vendorCode,
-            color: xmlColor,
+            color:
+              xmlColor,
             agerPrice,
             konaLadyPrice,
             stockQuantity,
@@ -781,8 +1042,10 @@ export async function GET() {
 
         if (
           existing.measurements
-            .length === 0 &&
-          measurements.length > 0
+            .length ===
+            0 &&
+          measurements.length >
+            0
         ) {
           existing.measurements =
             measurements;
@@ -790,8 +1053,10 @@ export async function GET() {
 
         if (
           existing.pictures
-            .length === 0 &&
-          pictures.length > 0
+            .length ===
+            0 &&
+          pictures.length >
+            0
         ) {
           existing.pictures =
             pictures;
@@ -802,7 +1067,10 @@ export async function GET() {
     const preview =
       Array.from(
         productMap.values()
-      ).slice(0, 10);
+      ).slice(
+        0,
+        10
+      );
 
     const products =
       productMap.size;
@@ -811,9 +1079,14 @@ export async function GET() {
       Array.from(
         productMap.values()
       ).reduce(
-        (sum, product) =>
+        (
+          sum,
+          product
+        ) =>
           sum +
-          product.variants.length,
+          product
+            .variants
+            .length,
         0
       );
 
@@ -821,7 +1094,10 @@ export async function GET() {
       Array.from(
         productMap.values()
       ).reduce(
-        (sum, product) =>
+        (
+          sum,
+          product
+        ) =>
           sum +
           product.stockQuantity,
         0
@@ -831,7 +1107,9 @@ export async function GET() {
       Array.from(
         productMap.values()
       ).filter(
-        (product) =>
+        (
+          product
+        ) =>
           product.stockQuantity >
           0
       ).length;
