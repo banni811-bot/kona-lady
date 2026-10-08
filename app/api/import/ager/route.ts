@@ -103,7 +103,6 @@ function normalizeColor(value: unknown): string {
     [/коричневі/g, "коричневый"],
 
     [/бежевий/g, "бежевый"],
-    [/бежевий/g, "бежевый"],
 
     [/рожевий/g, "розовый"],
     [/рожева/g, "розовый"],
@@ -156,15 +155,17 @@ function normalizeSize(value: unknown): string {
 }
 
 /**
- * В AGER в Артикул1/Артикул2 артикул обычно находится
- * внутри строки, например:
+ * Извлекает полноценный артикул из Артикул1/Артикул2.
+ *
+ * Примеры:
+ * "Свитер мужской новогодний 214R21302_Джинс"
+ * -> "214r21302"
  *
  * "Блуза 230R101-1_Белый"
- * "Блуза 230R1122-10-U-11 -уценка_Зеленый"
- * "Свитер мужской 214R21302_Джинс"
+ * -> "230r101-1"
  *
- * Нам нужен именно код модели, а не последнее число вроде "1",
- * "10" или слово "уценка".
+ * "Блуза 230R1122-10-U-11 -уценка_Зеленый"
+ * -> "230r1122-10-u-11"
  */
 function extractArticleFromField(value: unknown): string {
   const raw = text(value);
@@ -175,40 +176,49 @@ function extractArticleFromField(value: unknown): string {
 
   const cleaned = beforeColor
     .replace(/\s*-\s*уценка\s*$/i, "")
-    .replace(/\s+/g, " ")
+    .replace(/\s+уценка\s*$/i, "")
     .trim();
 
-  const matches = cleaned.match(
-    /[A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+(?:[-/][A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+)+/g
+  /*
+   * Ищем код, начинающийся с буквы или цифры,
+   * но обязательно содержащий буквы и цифры.
+   *
+   * Поддерживаются:
+   * 214R21302
+   * 230R101-1
+   * 230R1122-10
+   * 230R1122-10-U-11
+   * AG-0010763
+   */
+  const articleMatches = cleaned.match(
+    /[A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+(?:-[A-Za-zА-Яа-яІіЇїЄєҐґ0-9]+)*/g
   );
 
-  if (matches && matches.length > 0) {
-    const candidates = matches
-      .map((item) => item.trim())
-      .filter((item) => /[A-Za-zА-Яа-яІіЇїЄєҐґ]/.test(item));
-
-    if (candidates.length > 0) {
-      return normalize(candidates[candidates.length - 1]);
-    }
+  if (!articleMatches || articleMatches.length === 0) {
+    return "";
   }
 
-  const fallback = cleaned.match(
-    /[A-Za-zА-Яа-яІіЇїЄєҐґ]+[A-Za-zА-Яа-яІіЇїЄєҐґ0-9]*/g
-  );
+  const candidates = articleMatches
+    .map((item) => item.trim())
+    .filter((item) => {
+      const hasLetter = /[A-Za-zА-Яа-яІіЇїЄєҐґ]/.test(item);
+      const hasNumber = /[0-9]/.test(item);
 
-  if (fallback && fallback.length > 0) {
-    const candidates = fallback.filter(
-      (item) =>
-        /[0-9]/.test(item) &&
-        /[A-Za-zА-Яа-яІіЇїЄєҐґ]/.test(item)
-    );
+      return hasLetter && hasNumber;
+    });
 
-    if (candidates.length > 0) {
-      return normalize(candidates[candidates.length - 1]);
-    }
+  if (candidates.length === 0) {
+    return "";
   }
 
-  return "";
+  /*
+   * Берём последний подходящий код.
+   * Для:
+   * "Свитер мужской новогодний 214R21302"
+   * это будет именно "214R21302",
+   * а не "новогодний".
+   */
+  return normalize(candidates[candidates.length - 1]);
 }
 
 function baseArticle(
@@ -245,7 +255,9 @@ function asNumber(value: unknown): number | null {
 }
 
 function parseXlsRows(workbook: XLSX.WorkBook): AnyRecord[] {
-  const sheet = workbook.Sheets["TDSheet"] ?? workbook.Sheets[workbook.SheetNames[0]];
+  const sheet =
+    workbook.Sheets["TDSheet"] ??
+    workbook.Sheets[workbook.SheetNames[0]];
 
   if (!sheet) {
     throw new Error("Лист TDSheet не найден");
@@ -297,8 +309,14 @@ function getXmlParam(
   for (const param of params) {
     const name = normalize(param?.["@_name"]);
 
-    if (names.some((item) => name === normalize(item))) {
-      return text(param?.["#text"] ?? param);
+    if (
+      names.some(
+        (item) => name === normalize(item)
+      )
+    ) {
+      return text(
+        param?.["#text"] ?? param
+      );
     }
   }
 
@@ -322,7 +340,10 @@ function getDescription(offer: AnyRecord): string {
 function stripHtml(value: string): string {
   return value
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(
+      /<\/(p|div|tr|li|h[1-6])>/gi,
+      "\n"
+    )
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&quot;/gi, '"')
@@ -336,14 +357,12 @@ function parseMeasurements(
 ): Measurement[] {
   if (!description) return [];
 
-  const html = description;
-
   const measurements: Measurement[] = [];
 
   const rowRegex =
     /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
 
-  const rows = html.matchAll(rowRegex);
+  const rows = description.matchAll(rowRegex);
 
   for (const rowMatch of rows) {
     const rowHtml = rowMatch[1];
@@ -352,7 +371,9 @@ function parseMeasurements(
       rowHtml.matchAll(
         /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi
       )
-    ).map((match) => stripHtml(match[1]));
+    ).map((match) =>
+      stripHtml(match[1])
+    );
 
     if (cells.length < 2) continue;
 
@@ -363,7 +384,9 @@ function parseMeasurements(
     );
 
     const size = normalizeSize(
-      sizeMatch?.[1] ?? sizeMatch?.[2] ?? cells[0]
+      sizeMatch?.[1] ??
+        sizeMatch?.[2] ??
+        cells[0]
     );
 
     if (!size) continue;
@@ -371,7 +394,10 @@ function parseMeasurements(
     const numbers = cells
       .slice(1)
       .map((cell) => asNumber(cell))
-      .filter((value): value is number => value !== null);
+      .filter(
+        (value): value is number =>
+          value !== null
+      );
 
     if (numbers.length < 1) continue;
 
@@ -386,7 +412,10 @@ function parseMeasurements(
     });
   }
 
-  const unique = new Map<string, Measurement>();
+  const unique = new Map<
+    string,
+    Measurement
+  >();
 
   for (const item of measurements) {
     if (!unique.has(item.size)) {
@@ -397,17 +426,30 @@ function parseMeasurements(
   return Array.from(unique.values());
 }
 
-function buildXmlIndex(offers: AnyRecord[]) {
-  const index = new Map<string, AnyRecord[]>();
+function buildXmlIndex(
+  offers: AnyRecord[]
+) {
+  const index = new Map<
+    string,
+    AnyRecord[]
+  >();
 
   for (const offer of offers) {
-    const vendorCode = text(offer.vendorCode);
+    const vendorCode =
+      text(offer.vendorCode);
+
     const color =
-      getXmlParam(offer, ["Цвет", "Колір"]) ||
+      getXmlParam(offer, [
+        "Цвет",
+        "Колір",
+      ]) ||
       text(offer.color);
 
     const size =
-      getXmlParam(offer, ["Размер", "Розмір"]) ||
+      getXmlParam(offer, [
+        "Размер",
+        "Розмір",
+      ]) ||
       text(offer.size);
 
     const key = [
@@ -416,12 +458,19 @@ function buildXmlIndex(offers: AnyRecord[]) {
       normalizeSize(size),
     ].join("|");
 
-    if (!vendorCode || !color || !size) {
+    if (
+      !vendorCode ||
+      !color ||
+      !size
+    ) {
       continue;
     }
 
-    const existing = index.get(key) ?? [];
+    const existing =
+      index.get(key) ?? [];
+
     existing.push(offer);
+
     index.set(key, existing);
   }
 
@@ -438,7 +487,10 @@ export async function GET() {
     const xmlUrl =
       "http://ager.ua/download/catalog_ua.xml";
 
-    const [xlsResponse, xmlResponse] = await Promise.all([
+    const [
+      xlsResponse,
+      xmlResponse,
+    ] = await Promise.all([
       fetch(xlsUrl, {
         cache: "no-store",
       }),
@@ -459,58 +511,84 @@ export async function GET() {
       );
     }
 
-    const [xlsBuffer, xmlText] = await Promise.all([
+    const [
+      xlsBuffer,
+      xmlText,
+    ] = await Promise.all([
       xlsResponse.arrayBuffer(),
       xmlResponse.text(),
     ]);
 
-    const workbook = XLSX.read(xlsBuffer, {
-      type: "array",
-    });
+    const workbook = XLSX.read(
+      xlsBuffer,
+      {
+        type: "array",
+      }
+    );
 
-    const xlsRows = parseXlsRows(workbook);
+    const xlsRows =
+      parseXlsRows(workbook);
 
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-      textNodeName: "#text",
-      isArray: (name) =>
-        [
-          "offer",
-          "picture",
-          "param",
-        ].includes(name),
-    });
+    const parser =
+      new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "@_",
+        textNodeName: "#text",
+        isArray: (name) =>
+          [
+            "offer",
+            "picture",
+            "param",
+          ].includes(name),
+      });
 
-    const xml = parser.parse(xmlText);
+    const xml =
+      parser.parse(xmlText);
 
-    const offers = xml?.yml_catalog?.shop?.offers?.offer;
+    const offers =
+      xml?.yml_catalog?.shop
+        ?.offers?.offer;
 
     if (!offers) {
-      throw new Error("В XML не найден раздел offers");
+      throw new Error(
+        "В XML не найден раздел offers"
+      );
     }
 
-    const xmlOffers = xmlArray(offers) as AnyRecord[];
+    const xmlOffers =
+      xmlArray(offers) as AnyRecord[];
 
-    const xmlIndex = buildXmlIndex(xmlOffers);
+    const xmlIndex =
+      buildXmlIndex(xmlOffers);
 
-    const productMap = new Map<string, ProductGroup>();
+    const productMap =
+      new Map<
+        string,
+        ProductGroup
+      >();
 
     let matchedRows = 0;
     let noMatchRows = 0;
     let multipleMatchRows = 0;
 
-    const noMatchesSample: AnyRecord[] = [];
-    const multipleMatchesSample: AnyRecord[] = [];
+    const noMatchesSample: AnyRecord[] =
+      [];
+
+    const multipleMatchesSample: AnyRecord[] =
+      [];
 
     for (const row of xlsRows) {
-      const article1 = text(row["Артикул1 *"]);
-      const article2 = text(row["Артикул2 *"]);
+      const article1 =
+        text(row["Артикул1 *"]);
 
-      const article = baseArticle(
-        article1,
-        article2
-      );
+      const article2 =
+        text(row["Артикул2 *"]);
+
+      const article =
+        baseArticle(
+          article1,
+          article2
+        );
 
       const color =
         text(row["Цвет *"]) ||
@@ -520,9 +598,14 @@ export async function GET() {
         text(row["Розмір *"]) ||
         text(row["Размер *"]);
 
-      const normalizedArticle = normalize(article);
-      const normalizedColor = normalizeColor(color);
-      const normalizedSize = normalizeSize(size);
+      const normalizedArticle =
+        normalize(article);
+
+      const normalizedColor =
+        normalizeColor(color);
+
+      const normalizedSize =
+        normalizeSize(size);
 
       const key = [
         normalizedArticle,
@@ -530,17 +613,24 @@ export async function GET() {
         normalizedSize,
       ].join("|");
 
-      const matches = xmlIndex.get(key) ?? [];
+      const matches =
+        xmlIndex.get(key) ?? [];
 
       if (matches.length === 0) {
         noMatchRows++;
 
-        if (noMatchesSample.length < 20) {
+        if (
+          noMatchesSample.length < 20
+        ) {
           noMatchesSample.push({
-            code: text(row["Код"]),
+            code: text(
+              row["Код"]
+            ),
             article,
-            color: normalizedColor,
-            size: normalizedSize,
+            color:
+              normalizedColor,
+            size:
+              normalizedSize,
             article1,
             article2,
           });
@@ -552,16 +642,28 @@ export async function GET() {
       if (matches.length > 1) {
         multipleMatchRows++;
 
-        if (multipleMatchesSample.length < 20) {
+        if (
+          multipleMatchesSample.length <
+          20
+        ) {
           multipleMatchesSample.push({
-            code: text(row["Код"]),
-            article,
-            color: normalizedColor,
-            size: normalizedSize,
-            matches: matches.map(
-              (offer) =>
-                `${text(offer.group_id)}_${text(offer["@_id"])}`
+            code: text(
+              row["Код"]
             ),
+            article,
+            color:
+              normalizedColor,
+            size:
+              normalizedSize,
+            matches:
+              matches.map(
+                (offer) =>
+                  `${text(
+                    offer.group_id
+                  )}_${text(
+                    offer["@_id"]
+                  )}`
+              ),
           });
         }
 
@@ -570,7 +672,8 @@ export async function GET() {
 
       matchedRows++;
 
-      const offer = matches[0];
+      const offer =
+        matches[0];
 
       const groupId =
         text(offer.group_id) ||
@@ -585,43 +688,63 @@ export async function GET() {
 
       const name =
         text(offer.name) ||
-        text(row["Наименование"]);
+        text(
+          row["Наименование"]
+        );
 
       const xmlColor =
-        getXmlParam(
-          offer,
-          ["Цвет", "Колір"]
-        ) || color;
+        getXmlParam(offer, [
+          "Цвет",
+          "Колір",
+        ]) || color;
 
       const xmlSize =
-        getXmlParam(
-          offer,
-          ["Размер", "Розмір"]
-        ) || size;
+        getXmlParam(offer, [
+          "Размер",
+          "Розмір",
+        ]) || size;
 
       const agerPrice =
-        asNumber(row["Ціна дропшиппінг"]) ??
-        asNumber(offer.price) ??
+        asNumber(
+          row[
+            "Ціна дропшиппінг"
+          ]
+        ) ??
+        asNumber(
+          offer.price
+        ) ??
         0;
 
       const konaLadyPrice =
-        ceilKonaPrice(agerPrice);
+        ceilKonaPrice(
+          agerPrice
+        );
 
       const stockQuantity =
-        asNumber(row["Кількість *"]) ?? 0;
+        asNumber(
+          row["Кількість *"]
+        ) ?? 0;
 
-      const pictures = getPictures(offer);
+      const pictures =
+        getPictures(offer);
 
       const description =
-        getDescription(offer);
+        getDescription(
+          offer
+        );
 
       const measurements =
-        parseMeasurements(description);
+        parseMeasurements(
+          description
+        );
 
       const existing =
-        productMap.get(groupId);
+        productMap.get(
+          groupId
+        );
 
-      const variant: VariantPreview = {
+      const variant:
+        VariantPreview = {
         offerId,
         size: xmlSize,
         color: xmlColor,
@@ -631,95 +754,132 @@ export async function GET() {
       };
 
       if (!existing) {
-        productMap.set(groupId, {
+        productMap.set(
           groupId,
-          name,
-          vendorCode,
-          color: xmlColor,
-          agerPrice,
-          konaLadyPrice,
-          stockQuantity,
-          variants: [variant],
-          pictures,
-          measurements,
-        });
+          {
+            groupId,
+            name,
+            vendorCode,
+            color: xmlColor,
+            agerPrice,
+            konaLadyPrice,
+            stockQuantity,
+            variants: [
+              variant,
+            ],
+            pictures,
+            measurements,
+          }
+        );
       } else {
-        existing.variants.push(variant);
-        existing.stockQuantity += stockQuantity;
+        existing.variants.push(
+          variant
+        );
+
+        existing.stockQuantity +=
+          stockQuantity;
 
         if (
-          existing.measurements.length === 0 &&
+          existing.measurements
+            .length === 0 &&
           measurements.length > 0
         ) {
-          existing.measurements = measurements;
+          existing.measurements =
+            measurements;
         }
 
         if (
-          existing.pictures.length === 0 &&
+          existing.pictures
+            .length === 0 &&
           pictures.length > 0
         ) {
-          existing.pictures = pictures;
+          existing.pictures =
+            pictures;
         }
       }
     }
 
-    const preview = Array.from(
-      productMap.values()
-    ).slice(0, 10);
+    const preview =
+      Array.from(
+        productMap.values()
+      ).slice(0, 10);
 
     const products =
       productMap.size;
 
     const variants =
-      Array.from(productMap.values()).reduce(
+      Array.from(
+        productMap.values()
+      ).reduce(
         (sum, product) =>
-          sum + product.variants.length,
+          sum +
+          product.variants.length,
         0
       );
 
     const totalStock =
-      Array.from(productMap.values()).reduce(
+      Array.from(
+        productMap.values()
+      ).reduce(
         (sum, product) =>
-          sum + product.stockQuantity,
+          sum +
+          product.stockQuantity,
         0
       );
 
     const productsWithStock =
-      Array.from(productMap.values()).filter(
+      Array.from(
+        productMap.values()
+      ).filter(
         (product) =>
-          product.stockQuantity > 0
+          product.stockQuantity >
+          0
       ).length;
 
     const productsWithoutStock =
-      products - productsWithStock;
+      products -
+      productsWithStock;
 
     return NextResponse.json({
       ok: true,
-      test: "AGER full catalog import preview",
-      writeToSupabase: false,
+
+      test:
+        "AGER full catalog import preview",
+
+      writeToSupabase:
+        false,
 
       source: {
         xlsUrl,
         xmlUrl,
-        xlsFileSizeBytes: xlsBuffer.byteLength,
-        xmlFileSizeBytes: Buffer.byteLength(
-          xmlText,
-          "utf8"
-        ),
+        xlsFileSizeBytes:
+          xlsBuffer.byteLength,
+        xmlFileSizeBytes:
+          Buffer.byteLength(
+            xmlText,
+            "utf8"
+          ),
         xlsSheetName:
           workbook.SheetNames[0],
-        xlsRows: xlsRows.length,
-        xmlOffers: xmlOffers.length,
+        xlsRows:
+          xlsRows.length,
+        xmlOffers:
+          xmlOffers.length,
       },
 
       matching: {
         rule:
           "article from Артикул1/Артикул2 + normalized color + size",
+
         matchedRows,
         noMatchRows,
         multipleMatchRows,
-        uniqueProducts: products,
+
+        uniqueProducts:
+          products,
+
         noMatchesSample,
+
         multipleMatchesSample,
       },
 
@@ -737,7 +897,8 @@ export async function GET() {
       preview,
 
       durationMs:
-        Date.now() - startedAt,
+        Date.now() -
+        startedAt,
     });
   } catch (error) {
     console.error(
