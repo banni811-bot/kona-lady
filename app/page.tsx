@@ -1254,40 +1254,24 @@ export default function Home() {
           })}
 
           <div className="mt-6 rounded-2xl bg-purple-50 p-4">
-            <div className="text-sm font-bold text-purple-700">
-              KONA LADY
-            </div>
+  <div className="text-sm font-bold text-purple-700">
+    KONA LADY
+  </div>
 
-            <div className="mt-1 text-xs leading-5 text-zinc-500">
-              Начни свой стиль с KONA.
-            </div>
-          </div>
-        </aside>
+  <div className="mt-1 text-xs leading-5 text-zinc-500">
+    Начни свой стиль с KONA.
+  </div>
+</div>
+</aside>
 
-        <section className="space-y-5">
-          <div className="planet-banner relative min-h-[310px] overflow-hidden rounded-[32px] bg-[#16052d] p-7 text-white shadow-lg md:p-10">
-            <div className="planet planet-one" />
-            <div className="planet planet-two" />
-            <div className="planet planet-three" />
-
-            <div className="relative z-10 max-w-xl">
-              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-purple-300">
-                KONA LADY
-              </div>
-
-              <h1 className="text-4xl font-black leading-tight md:text-6xl">
-                Начни свой
-                <br />
-                стиль с KONA.
-              </h1>
-
-              <p className="mt-5 max-w-md text-sm leading-6 text-purple-100 md:text-base">
-                Одежда, обувь, косметика и аксессуары —
-                всё для твоего образа.
-              </p>
-            </div>
-          </div>
-
+<section className="space-y-5">
+  <div className="overflow-hidden rounded-[32px] shadow-lg">
+    <img
+      src="/kona-luxury-banner.png"
+      alt="KONA LADY — Начни свой стиль с KONA"
+      className="block h-auto w-full"
+    />
+  </div>
           <div className="rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-600 text-xl text-white">
