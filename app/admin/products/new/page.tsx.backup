@@ -440,36 +440,6 @@ export default function NewProductPage() {
         }
       }
 
-      if (isAvailable && quantityNumber > 0) {
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-
-          if (session?.access_token) {
-            const response = await fetch("/api/push/new-product", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({ productId: product.id }),
-            });
-
-            if (!response.ok) {
-              console.error(
-                "Не удалось отправить уведомление о новинке:",
-                await response.text(),
-              );
-            }
-          }
-        } catch (notificationError) {
-          console.error(
-            "Ошибка уведомления о новинке:",
-            notificationError,
-          );
-        }
-      }
       setMessage(
         "Товар успешно добавлен!"
       );
