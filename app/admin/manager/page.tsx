@@ -296,6 +296,12 @@ function getProductName(product: RowData) {
 export default function ManagerPage() {
   const [products, setProducts] = useState<RowData[]>([]);
   const [orders, setOrders] = useState<RowData[]>([]);
+   const [financialTransactions, setFinancialTransactions] =
+    useState<RowData[]>([]);
+  const [loadingFinance, setLoadingFinance] =
+    useState(false);
+  const [financeError, setFinanceError] =
+    useState("");
   const [orderItems, setOrderItems] = useState<
     OrderItem[]
   >([]);
@@ -319,8 +325,8 @@ export default function ManagerPage() {
     useState("");
 
   const [activeTab, setActiveTab] = useState<
-    "products" | "orders" | "clients" | "reports"
-  >("products");
+  "products" | "orders" | "clients" | "reports" | "finance"
+>("products");
 
   const [expandedOrders, setExpandedOrders] =
     useState<number[]>([]);
@@ -369,6 +375,29 @@ export default function ManagerPage() {
     setLoadingProducts(false);
   }
 
+  async function loadFinancialTransactions() {
+    setLoadingFinance(true);
+    setFinanceError("");
+
+    const { data, error } = await supabase
+      .from("financial_transactions")
+      .select("*")
+      .order("transaction_date", {
+        ascending: false,
+      });
+
+    if (error) {
+      console.error(error);
+      setFinanceError(
+        "Не удалось загрузить финансовые операции."
+      );
+      setFinancialTransactions([]);
+    } else {
+      setFinancialTransactions(data || []);
+    }
+
+    setLoadingFinance(false);
+  }
   async function loadOrders() {
     setLoadingOrders(true);
     setOrdersError("");
@@ -425,11 +454,12 @@ export default function ManagerPage() {
     setLoadingItems(false);
   }
 
-  async function loadManagerData() {
+   async function loadManagerData() {
     await Promise.all([
       loadProducts(),
       loadOrders(),
       loadOrderItems(),
+      loadFinancialTransactions(),
     ]);
   }
 
@@ -2362,8 +2392,16 @@ export default function ManagerPage() {
               activeTab ===
                 "reports"
             )}
+        
           >
             📊 Отчётность
+          </button>
+
+          <button
+            onClick={() => setActiveTab("finance")}
+            style={tabStyle(activeTab === "finance")}
+          >
+            💰 Финансы
           </button>
 
           <button
@@ -4735,7 +4773,141 @@ export default function ManagerPage() {
             )}
           </section>
         )}
+        {activeTab === "finance" && (
+          <section
+            style={{
+              background: "#ffffff",
+              border: "2px solid #cbbddd",
+              borderRadius: "22px",
+              padding: "22px",
+              marginBottom: "20px",
+              boxShadow: "0 6px 20px rgba(80, 50, 120, 0.08)",
+            }}
+          >
+            <h2 style={{ fontSize: "24px", fontWeight: 800, marginBottom: "8px" }}>
+              💰 Финансы магазина
+            </h2>
 
+            <p style={{ color: "#75677f", marginBottom: "20px" }}>
+              Учёт подтверждённых поступлений, расходов и возвратов.
+              Суммы заказов сами по себе не считаются полученными деньгами.
+            </p>
+
+            {loadingFinance && <p>Загружаем финансовые операции...</p>}
+
+            {financeError && (
+              <p style={{ color: "#b42318", marginBottom: "16px" }}>
+                {financeError}
+              </p>
+            )}
+
+            {!loadingFinance && !financeError && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: "14px",
+                    marginBottom: "24px",
+                  }}
+                >
+                  <StatCard
+                    title="Подтверждённые поступления"
+                    value={`${financialTransactions
+                      .filter((item) => item.type === "income" && item.status === "confirmed")
+                      .reduce((sum, item) => sum + Number(item.amount_uah || 0), 0)
+                      .toLocaleString("uk-UA")} грн`}
+                  />
+
+                  <StatCard
+                    title="Подтверждённые расходы"
+                    value={`${financialTransactions
+                      .filter((item) => item.type === "expense" && item.status === "confirmed")
+                      .reduce((sum, item) => sum + Number(item.amount_uah || 0), 0)
+                      .toLocaleString("uk-UA")} грн`}
+                  />
+
+                  <StatCard
+                    title="Подтверждённые возвраты"
+                    value={`${financialTransactions
+                      .filter((item) => item.type === "refund" && item.status === "confirmed")
+                      .reduce((sum, item) => sum + Number(item.amount_uah || 0), 0)
+                      .toLocaleString("uk-UA")} грн`}
+                  />
+
+                  <StatCard
+                    title="Чистый денежный результат"
+                    value={`${(
+                      financialTransactions
+                        .filter((item) => item.status === "confirmed")
+                        .reduce((sum, item) => {
+                          const amount = Number(item.amount_uah || 0);
+                          if (item.type === "income") return sum + amount;
+                          if (item.type === "expense" || item.type === "refund") return sum - amount;
+                          return sum;
+                        }, 0)
+                    ).toLocaleString("uk-UA")} грн`}
+                  />
+                </div>
+
+                <h3 style={{ fontSize: "19px", fontWeight: 800, marginBottom: "12px" }}>
+                  Финансовые операции
+                </h3>
+
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "850px" }}>
+                    <thead>
+                      <tr style={{ background: "#f7f3ff" }}>
+                        {["Дата", "Тип", "Категория", "Сумма", "Оплата", "Статус", "Описание"].map((title) => (
+                          <th key={title} style={thStyle}>{title}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {financialTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} style={{ ...tdStyle, textAlign: "center", padding: "24px" }}>
+                            Финансовых операций пока нет.
+                          </td>
+                        </tr>
+                      ) : (
+                        financialTransactions.map((item) => (
+                          <tr key={item.id}>
+                            <td style={tdStyle}>
+                              {item.transaction_date
+                                ? new Date(item.transaction_date).toLocaleDateString("uk-UA")
+                                : "—"}
+                            </td>
+                            <td style={tdStyle}>
+                              {item.type === "income"
+                                ? "Поступление"
+                                : item.type === "expense"
+                                  ? "Расход"
+                                  : "Возврат"}
+                            </td>
+                            <td style={tdStyle}>{item.category || "—"}</td>
+                            <td style={tdStyle}>
+                              {Number(item.amount_uah || 0).toLocaleString("uk-UA")} грн
+                            </td>
+                            <td style={tdStyle}>{item.payment_method || "—"}</td>
+                            <td style={tdStyle}>
+                              {item.status === "confirmed"
+                                ? "Подтверждено"
+                                : item.status === "pending"
+                                  ? "Ожидает"
+                                  : "Отменено"}
+                            </td>
+                            <td style={tdStyle}>{item.description || "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
+        )}
         <div
           style={{
             background:
