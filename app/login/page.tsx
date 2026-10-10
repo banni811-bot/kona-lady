@@ -106,23 +106,6 @@ export default function LoginPage() {
         return;
       }
 
-      if (signUpData.user) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert({
-            id: signUpData.user.id,
-            name: name || null,
-          });
-
-        if (profileError) {
-          setError(
-            "Аккаунт создан, но данные профиля не удалось сохранить. Попробуйте войти позже."
-          );
-          setLoading(false);
-          return;
-        }
-      }
-
       setMessage(
         `📧 Письмо отправлено!
 
