@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -154,6 +155,33 @@ const accessoryEmojis: Record<string, string> = {
   scarves: "🧣",
 };
 
+// Реальные категории одежды AGER в базе данных.
+// Фильтры применяются только к категории одежды.
+const clothingCategoryFilters: Record<string, string> = {
+  dresses:
+    "category.ilike.%сукні%,category.ilike.%сарафани%,category.ilike.%комбінезони%",
+
+  tops:
+    "category.ilike.%футболки%,category.ilike.%блузки%,category.ilike.%сорочки%,category.ilike.%топи%,category.ilike.%майки%,category.ilike.%батники%,category.ilike.%боді%,category.ilike.%туніки%,category.ilike.%водолазки%,category.ilike.%гольфи%",
+
+  jeans:
+    "category.ilike.%джинси%,category.ilike.%штани%,category.ilike.%лосини%,category.ilike.%шорти%",
+
+  skirts: "category.ilike.%спідниці%",
+
+  sportswear:
+    "category.ilike.%спортивні костюми%,category.ilike.%спортивні штани%,category.ilike.%спортивні шорти%",
+
+  outerwear:
+    "category.ilike.%куртки%,category.ilike.%жилети%,category.ilike.%плащі%,category.ilike.%вітровки%,category.ilike.%піджаки%",
+
+  sweaters:
+    "category.ilike.%кофти%,category.ilike.%светри%,category.ilike.%кардигани%,category.ilike.%худі%,category.ilike.%світшоти%,category.ilike.%пуловери%",
+
+  homewear:
+    "category.ilike.%піжами%,category.ilike.%халати%,category.ilike.%ночнушки%",
+};
+
 export default function SubcategoryPage() {
   const params = useParams();
 
@@ -212,34 +240,62 @@ export default function SubcategoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadProducts() {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, category, subcategory, price_uah, image_url, description, store_name",
-        )
-        .eq("is_active", true)
+      try {
+        const filter = isClothing
+  ? clothingCategoryFilters[subcategory]
+  : undefined;
+
+const query = supabase
+  .from("products")
+  .select(
+    "id, name, category, subcategory, price_uah, image_url, description, store_name",
+  )
+  .eq("is_active", true);
+
+const result = filter
+  ? await query.or(filter).order("id", { ascending: true })
+  : isClothing
+    ? await query.order("id", { ascending: true })
+    : await query
         .eq("category", databaseCategory)
         .eq("subcategory", subcategory)
         .order("id", { ascending: true });
+        if (cancelled) return;
 
-      if (error) {
+        if (result.error) {
+          console.error("Ошибка загрузки товаров:", result.error);
+          setProducts([]);
+        } else {
+          setProducts((result.data || []) as Product[]);
+        }
+      } catch (error) {
         console.error("Ошибка загрузки товаров:", error);
-        setProducts([]);
-      } else {
-        setProducts(data || []);
-      }
 
-      setLoading(false);
+        if (!cancelled) {
+          setProducts([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
 
     if (isClothing || isShoes || isCosmetics || isAccessories) {
       loadProducts();
     } else {
+      setProducts([]);
       setLoading(false);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     databaseCategory,
     isClothing,
@@ -362,9 +418,7 @@ export default function SubcategoryPage() {
               KONA LADY
             </p>
 
-            <h2 className="mt-1 text-3xl font-bold">
-              {title}
-            </h2>
+            <h2 className="mt-1 text-3xl font-bold">{title}</h2>
           </div>
 
           {!loading && (

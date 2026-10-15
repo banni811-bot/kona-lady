@@ -120,23 +120,85 @@ export default function Home() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [cartCount, setCartCount] = useState(0);
 
+   const clothingCategoryKeywords: Record<string, string[]> = {
+    blouses: ["блузк"],
+    pants: ["штани"],
+    jeans: ["джинси", "джинсы"],
+    homewear: ["піжам", "халат", "ночнуш", "боді"],
+    vests: ["жилет"],
+    cardigans: ["кардиган"],
+    jumpsuits: ["комбінезон"],
+    suits: ["костюм"],
+    leggings: ["лосин"],
+    "tank-tops": ["майк"],
+    blazers: ["піджак"],
+    dresses: ["сукні"],
+    shirts: ["сорочк"],
+    sundresses: ["сарафан"],
+    "sweaters-hoodies": [
+      "светр",
+      "світер",
+      "світшот",
+      "худі",
+      "кофт",
+      "батник",
+      "водолазк",
+      "гольф",
+      "пуловер",
+    ],
+    sportswear: [
+      "спортивні костюми",
+      "спортивні штани",
+      "спортивні шорти",
+    ],
+    tops: ["топ"],
+    tunics: ["тунік"],
+    "t-shirts": ["футболк"],
+    shorts: ["шорти"],
+    skirts: ["спідниц"],
+    outerwear: [
+      "куртк",
+      "вітровк",
+      "плащ",
+    ],
+    underwear: [
+      "трус",
+      "колгот",
+      "шкарпет",
+      "купальник",
+    ],
+  };
+
   const filteredProducts =
     aiFilteredProductIds !== null
       ? products.filter((product) =>
           aiFilteredProductIds.includes(product.id),
         )
-      : selectedSubcategory !== null
-        ? products.filter(
-            (product) =>
-              product.category === selectedCategory &&
-              product.subcategory === selectedSubcategory,
-          )
-        : selectedCategory === "Все"
-          ? products
-          : products.filter(
-              (product) => product.category === selectedCategory,
-            );
+      : selectedSubcategory !== null &&
+          selectedCategory === categories[0]
+        ? products.filter((product) => {
+            const category = (product.category ?? "")
+              .toLowerCase()
+              .trim();
 
+            const keywords =
+              clothingCategoryKeywords[selectedSubcategory] ?? [];
+
+            return keywords.some((keyword) =>
+              category.includes(keyword),
+            );
+          })
+        : selectedSubcategory !== null
+          ? products.filter(
+              (product) =>
+                product.category === selectedCategory &&
+                product.subcategory === selectedSubcategory,
+            )
+          : selectedCategory === "Все"
+            ? products
+            : products.filter(
+                (product) => product.category === selectedCategory,
+              );
   const selectedSubcategoryLabel =
     selectedCategory !== "Все" && selectedSubcategory
       ? subcategories[selectedCategory]?.find(
