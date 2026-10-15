@@ -386,10 +386,16 @@ export default function ManagerPage() {
         ascending: false,
       });
 
-    if (error) {
-      console.error(error);
+        if (error) {
+      console.error("Ошибка загрузки финансовых операций:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+
       setFinanceError(
-        "Не удалось загрузить финансовые операции."
+        `Не удалось загрузить финансовые операции: ${error.message}`
       );
       setFinancialTransactions([]);
     } else {
