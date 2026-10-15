@@ -238,6 +238,7 @@ export async function GET(request: Request) {
       const available = getAvailable(offer);
 
       const stockCandidate =
+        offer?.quantity_in_stock ??
         offer?.quantity ??
         offer?.stock_quantity ??
         offer?.stock ??

@@ -21,6 +21,8 @@ async function main() {
   console.log('Всего предложений:', offers.length);
 
   const results = [];
+  const allParamNames = new Set();
+const allTagNames = new Set();
   const seen = new Set();
 
   for (const match of offers) {
@@ -45,37 +47,69 @@ async function main() {
 
     const name = getTag('name');
     const params = [];
+    for (const p of body.matchAll(/<param\b([^>]*)>/gi)) {
+  const nameMatch = p[1].match(/\bname=['"]([^'"]+)['"]/i);
+  if (nameMatch) allParamNames.add(nameMatch[1]);
+}
 
-    for (const p of body.matchAll(
-      /<param\b([^>]*)>([\s\S]*?)<\/param>/gi
-    )) {
-      const nameMatch = p[1].match(/\bname=['"]([^'"]+)['"]/i);
-      if (!nameMatch) continue;
+for (const t of body.matchAll(/<([a-zA-Z_][\w:-]*)\b/g)) {
+  allTagNames.add(t[1]);
+}
 
-      const paramName = nameMatch[1];
-      const value = p[2].replace(/<[^>]*>/g, '').trim();
+for (const p of body.matchAll(
+  /<param\b([^>]*)>([\s\S]*?)<\/param>/gi
+)) {
+  const nameMatch = p[1].match(/\bname=['"]([^'"]+)['"]/i);
+  if (!nameMatch) continue;
 
-      if (/артик|код|sku|article|модель|товарн.*номер/i.test(paramName)) {
-        params.push(`${paramName}=${value}`);
-      }
-    }
+  const paramName = nameMatch[1];
+  const value = p[2].replace(/<[^>]*>/g, '').trim();
 
-    const key = getAttribute('group_id') + '|' + name;
-    if (seen.has(key)) continue;
-    seen.add(key);
+  params.push(`${paramName}=${value}`);
+}
+
+const stockMatch = body.match(
+  /<quantity_in_stock\b[^>]*>([\s\S]*?)<\/quantity_in_stock>/i
+);
+
+const quantityInStock = stockMatch
+  ? stockMatch[1].replace(/<[^>]*>/g, '').trim()
+  : '';
+
+    const key = getAttribute('group_id');
+
+if (!seen.has(key)) {
+  seen.add(key);
+} else {
+  // Повторная группа: оставляем предложение для проверки вариантов
+}
 
     results.push({
-      id: getAttribute('id'),
-      group: getAttribute('group_id'),
-      available: getAttribute('available'),
-      name,
-      params
-    });
+  id: getAttribute('id'),
+  group: getAttribute('group_id'),
+  available: getAttribute('available'),
+  name,
+  params,
+  quantityInStock
+});
 
     if (results.length >= 30) break;
   }
+console.log('\n=== ВСЕ НАЗВАНИЯ XML-ТЕГОВ ===');
+console.log([...allTagNames].sort().join('\n'));
 
+console.log('\n=== ВСЕ НАЗВАНИЯ ПАРАМЕТРОВ ===');
+console.log([...allParamNames].sort().join('\n'));
+
+console.log('\n=== ПОЛЯ, ПОХОЖИЕ НА АРТИКУЛ ИЛИ КОД ===');
+console.log(
+  [...allParamNames, ...allTagNames]
+    .filter((name) => /артикул|код|sku|article|vendor|product.?id/i.test(name))
+    .sort()
+    .join('\n') || 'Совпадений не найдено'
+);
   console.log('\nПРОВЕРКА ПОЛЕЙ АРТИКУЛА И КОДА\n');
+  console.log('\nПРОВЕРКА РАЗМЕРОВ, ЦВЕТОВ И ОСТАТКОВ\n');
 
   for (const item of results) {
     console.log('----------------------------------------');
@@ -83,10 +117,11 @@ async function main() {
     console.log('ID группы:', item.group);
     console.log('Доступность:', item.available);
     console.log('Название:', item.name);
-    console.log(
-      'Поля с артикулом/кодом:',
-      item.params.length ? item.params.join(' | ') : 'Отдельное поле не найдено'
-    );
+   console.log(
+  'Все параметры:',
+  item.params.length ? item.params.join(' | ') : 'Параметры не найдены'
+);
+console.log('Остаток quantity_in_stock:', item.quantityInStock || 'Не найден');
   }
 
   console.log('\nПРОВЕРКА ЗАВЕРШЕНА');
