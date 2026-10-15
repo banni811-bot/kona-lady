@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -8,9 +7,21 @@ export default function AgerPreviewPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState("");
+  const [syncMode, setSyncMode] = useState(false);
 
-  async function runPreview() {
+  async function runRequest(sync: boolean) {
+    if (sync) {
+      const approved = window.confirm(
+        "Запустить первую синхронизацию AGER? " +
+          "Товары и варианты будут записаны в базу. " +
+          "Новые карточки останутся неактивными."
+      );
+
+      if (!approved) return;
+    }
+
     setLoading(true);
+    setSyncMode(sync);
     setResult(null);
     setError("");
 
@@ -21,16 +32,25 @@ export default function AgerPreviewPage() {
       } = await supabase.auth.getSession();
 
       if (sessionError || !session?.access_token) {
-        throw new Error("Сессия администратора не найдена. Войдите заново.");
+        throw new Error(
+          "Сессия администратора не найдена. Войдите в админку заново."
+        );
       }
 
-      const response = await fetch("/api/import/ager/preview", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        cache: "no-store",
-      });
+      const response = await fetch(
+        sync ? "/api/import/ager/sync" : "/api/import/ager/preview",
+        {
+          method: sync ? "POST" : "GET",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            ...(sync ? { "Content-Type": "application/json" } : {}),
+          },
+          ...(sync
+            ? { body: JSON.stringify({ confirmSync: true }) }
+            : {}),
+          cache: "no-store",
+        }
+      );
 
       const data = await response.json();
 
@@ -43,7 +63,9 @@ export default function AgerPreviewPage() {
       setResult(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Не удалось проверить каталог"
+        err instanceof Error
+          ? err.message
+          : "Не удалось выполнить запрос"
       );
     } finally {
       setLoading(false);
@@ -60,19 +82,21 @@ export default function AgerPreviewPage() {
       }}
     >
       <h1 style={{ fontSize: 28, fontWeight: 700 }}>
-        Предварительный просмотр AGER
+        Импорт каталога AGER
       </h1>
 
       <p style={{ marginTop: 16, lineHeight: 1.6 }}>
-        Проверяем XML-каталог, идентификаторы товаров, цены и доступность.
-        На этом этапе товары в базу данных не записываются.
+        Сначала проверь каталог. После проверки можно запустить
+        синхронизацию товаров и вариантов с базой данных.
+        Новые карточки создаются неактивными.
       </p>
 
       <button
-        onClick={runPreview}
+        onClick={() => runRequest(false)}
         disabled={loading}
         style={{
           marginTop: 20,
+          marginRight: 12,
           padding: "12px 20px",
           border: 0,
           borderRadius: 8,
@@ -82,7 +106,28 @@ export default function AgerPreviewPage() {
           cursor: loading ? "wait" : "pointer",
         }}
       >
-        {loading ? "Загружаем каталог..." : "Проверить каталог AGER"}
+        {loading && !syncMode
+          ? "Проверяем каталог..."
+          : "Проверить каталог AGER"}
+      </button>
+
+      <button
+        onClick={() => runRequest(true)}
+        disabled={loading}
+        style={{
+          marginTop: 20,
+          padding: "12px 20px",
+          border: 0,
+          borderRadius: 8,
+          background: loading ? "#888" : "#176b3a",
+          color: "#fff",
+          fontSize: 16,
+          cursor: loading ? "wait" : "pointer",
+        }}
+      >
+        {loading && syncMode
+          ? "Выполняется синхронизация..."
+          : "Загрузить товары AGER в базу"}
       </button>
 
       {error && (
@@ -103,8 +148,9 @@ export default function AgerPreviewPage() {
       {result !== null && (
         <section style={{ marginTop: 24 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700 }}>
-            Результат проверки
+            Результат {syncMode ? "синхронизации" : "проверки"}
           </h2>
+
           <pre
             style={{
               marginTop: 12,
