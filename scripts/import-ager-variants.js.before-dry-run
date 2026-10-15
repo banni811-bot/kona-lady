@@ -1,0 +1,228 @@
+
+const { createClient } = require("@supabase/supabase-js");
+const { XMLParser } = require("fast-xml-parser");
+
+const BATCH_SIZE = 200;
+const PRODUCT_BATCH_SIZE = 400;
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`Не найдена переменная ${name} в .env.local`);
+  return value;
+}
+
+function asText(value) {
+  if (value == null) return "";
+  if (typeof value === "object" && "#text" in value) {
+    return String(value["#text"] ?? "").trim();
+  }
+  return String(value).trim();
+}
+
+function getParam(offer, names) {
+  const params = Array.isArray(offer.param)
+    ? offer.param
+    : offer.param
+      ? [offer.param]
+      : [];
+
+  for (const param of params) {
+    const name = String(param?.["@_name"] ?? "").trim().toLowerCase();
+    if (names.includes(name)) return asText(param);
+  }
+
+  return "";
+}
+
+function chunks(items, size) {
+  const result = [];
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size));
+  }
+  return result;
+}
+
+async function main() {
+  const supabaseUrl = requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const supabaseKey = requiredEnv("SUPABASE_SECRET_KEY");
+  const feedUrl = requiredEnv("AGER_XML_URL");
+
+  const parsedUrl = new URL(feedUrl);
+  if (
+    parsedUrl.protocol !== "https:" ||
+    !["ager.ua", "www.ager.ua"].includes(parsedUrl.hostname)
+  ) {
+    throw new Error("AGER_XML_URL должен быть HTTPS-адресом ager.ua");
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  console.log("1/5. Загружаю XML-каталог AGER...");
+  const response = await fetch(feedUrl, {
+    signal: AbortSignal.timeout(180000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AGER вернул HTTP ${response.status}`);
+  }
+
+  const xml = await response.text();
+  console.log(`XML получен: ${(Buffer.byteLength(xml) / 1024 / 1024).toFixed(1)} МБ`);
+
+  console.log("2/5. Разбираю каталог и проверяю идентификаторы...");
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+    parseTagValue: false,
+    trimValues: true,
+  });
+
+  const document = parser.parse(xml);
+  const shop = document?.yml_catalog?.shop;
+  const rawOffers = shop?.offers?.offer;
+
+  if (!rawOffers) {
+    throw new Error("В XML не найден список offers");
+  }
+
+  const offers = Array.isArray(rawOffers) ? rawOffers : [rawOffers];
+  const uniqueOffers = new Map();
+
+  for (const offer of offers) {
+    const id = asText(offer?.["@_id"]);
+    const groupId = asText(offer?.["@_group_id"]);
+    const rawStock = offer?.quantity_in_stock;
+
+    if (!id || !groupId || rawStock == null || asText(rawStock) === "") {
+      throw new Error(
+        `Остановлено до записи: у варианта не хватает id, group_id или quantity_in_stock. ID: ${id || "(нет)"}`
+      );
+    }
+
+    if (uniqueOffers.has(id)) {
+      throw new Error(
+        `Остановлено до записи: повторяется offer_id ${id}`
+      );
+    }
+
+    const stock = Number(asText(rawStock).replace(",", "."));
+    if (!Number.isFinite(stock) || stock < 0) {
+      throw new Error(`Некорректный остаток у варианта ${id}`);
+    }
+
+    uniqueOffers.set(id, {
+      id,
+      groupId,
+      offer,
+      stock: Math.floor(stock),
+    });
+  }
+
+  const validOffers = [...uniqueOffers.values()];
+  const groupIds = [...new Set(validOffers.map((item) => item.groupId))];
+
+  console.log(`Предложений в XML: ${offers.length}`);
+  console.log(`Уникальных вариантов: ${validOffers.length}`);
+  console.log(`Групп товаров: ${groupIds.length}`);
+
+  console.log("3/5. Сопоставляю варианты с карточками в базе...");
+  const productByGroup = new Map();
+
+  for (const group of chunks(groupIds, PRODUCT_BATCH_SIZE)) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id,ager_group_id")
+      .in("ager_group_id", group);
+
+    if (error) throw new Error(`Ошибка чтения карточек: ${error.message}`);
+
+    for (const product of data ?? []) {
+      const key = asText(product.ager_group_id);
+      if (key) productByGroup.set(key, product.id);
+    }
+  }
+
+  const rows = [];
+  let skippedNoProduct = 0;
+
+  for (const item of validOffers) {
+    const productId = productByGroup.get(item.groupId);
+
+    if (productId == null) {
+      skippedNoProduct++;
+      continue;
+    }
+
+    rows.push({
+      product_id: productId,
+      ager_offer_id: item.id,
+      ager_group_id: item.groupId,
+      ager_sku: asText(item.offer.sku) || null,
+      ager_vendor_code: asText(item.offer.vendorCode) || null,
+      size: getParam(item.offer, [
+        "size",
+        "розмір",
+        "размер",
+      ]) || null,
+      color: getParam(item.offer, [
+        "color",
+        "колір",
+        "цвет",
+      ]) || null,
+      stock_quantity: item.stock,
+      is_available: false,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  console.log(`Вариантов для записи: ${rows.length}`);
+  console.log(`Без карточки в базе: ${skippedNoProduct}`);
+
+  if (rows.length === 0) {
+    throw new Error("Нет вариантов, сопоставленных с карточками. Запись отменена.");
+  }
+
+  console.log("4/5. Записываю варианты порциями...");
+  let written = 0;
+  const batches = chunks(rows, BATCH_SIZE);
+
+  for (let i = 0; i < batches.length; i++) {
+    const { error } = await supabase
+      .from("product_variants")
+      .upsert(batches[i], { onConflict: "ager_offer_id" });
+
+    if (error) {
+      throw new Error(
+        `Ошибка в порции ${i + 1}/${batches.length}, записано порций: ${i}. ` +
+        `Повторный запуск безопасен по ager_offer_id. ${error.message}`
+      );
+    }
+
+    written += batches[i].length;
+
+    if ((i + 1) % 5 === 0 || i + 1 === batches.length) {
+      console.log(`Записано ${written} из ${rows.length} вариантов`);
+    }
+  }
+
+  console.log("5/5. Импорт завершён.");
+  console.log({
+    totalOffers: offers.length,
+    uniqueOffers: validOffers.length,
+    matchedVariants: rows.length,
+    skippedNoProduct,
+    variantsWritten: written,
+    cardsActivated: 0,
+    variantsActivated: 0,
+  });
+}
+
+main().catch((error) => {
+  console.error("ИМПОРТ НЕ ЗАВЕРШЁН:", error.message);
+  process.exitCode = 1;
+});
