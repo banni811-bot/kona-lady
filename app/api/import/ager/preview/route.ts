@@ -45,14 +45,19 @@ function getNumber(value: unknown): number | null {
 }
 
 function getAvailable(offer: any): boolean | null {
-  const value = getText(offer?.["@_available"]).toLowerCase();
+  const stockCandidate =
+    offer?.quantity_in_stock ??
+    offer?.quantity ??
+    offer?.stock_quantity ??
+    offer?.stock ??
+    offer?.qty;
 
-  if (value === "true" || value === "1") return true;
-  if (value === "false" || value === "0") return false;
+  const stock = getNumber(stockCandidate);
 
-  return null;
+  if (stock === null) return null;
+
+  return stock > 0;
 }
-
 export async function GET(request: Request) {
   try {
     // 1. Проверяем обязательные серверные настройки.
@@ -275,6 +280,7 @@ export async function GET(request: Request) {
       };
     });
 
+    
     // Полный проход для счётчиков и проверки ID.
     // В базу ничего не записываем.
     seenIds.clear();
@@ -284,10 +290,22 @@ export async function GET(request: Request) {
     availableCount = 0;
     unavailableCount = 0;
 
+    const groupIds = new Set<string>();
+    let missingStockCount = 0;
+
     for (const offer of offers) {
       const offerId = getText(offer?.["@_id"]);
+      const groupId = getText(offer?.["@_group_id"]);
       const sourcePrice = getNumber(offer?.price);
-      const available = getAvailable(offer);
+
+      const stockCandidate =
+        offer?.quantity_in_stock ??
+        offer?.quantity ??
+        offer?.stock_quantity ??
+        offer?.stock ??
+        offer?.qty;
+
+      const sourceStock = getNumber(stockCandidate);
 
       if (!offerId) {
         missingIds++;
@@ -297,10 +315,24 @@ export async function GET(request: Request) {
         seenIds.add(offerId);
       }
 
-      if (sourcePrice === null) missingPrices++;
-      if (available === true) availableCount++;
-      if (available === false) unavailableCount++;
+      if (groupId) {
+        groupIds.add(groupId);
+      }
+
+      if (sourcePrice === null) {
+        missingPrices++;
+      }
+
+      if (sourceStock === null) {
+        missingStockCount++;
+      } else if (sourceStock > 0) {
+        availableCount++;
+      } else {
+        unavailableCount++;
+      }
     }
+
+    
 
     return NextResponse.json({
       ok: true,
@@ -308,11 +340,14 @@ export async function GET(request: Request) {
       databaseChanged: false,
       source: "personal_ager_xml",
       xmlSizeMB: Number((xml.length / 1024 / 1024).toFixed(2)),
-      totalOffers: offers.length,
+           totalOffers: offers.length,
+      totalVariants: offers.length,
+      totalCards: groupIds.size,
       uniqueOfferIds: seenIds.size,
       duplicateOfferIds: duplicateIds.size,
       missingOfferIds: missingIds,
       missingPrices,
+      missingStockCount,
       availableCount,
       unavailableCount,
       markupPercent: 25,
